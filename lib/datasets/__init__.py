@@ -15,7 +15,9 @@ ROOT_DIR = osp.join(osp.dirname(__file__), '..', '..')
 # We assume your matlab binary is in your path and called `matlab'.
 # If either is not true, just add it to your path and alias it as matlab, or
 # you could change this file.
-MATLAB = 'matlab'
+
+#MATLAB = 'matlab'
+MATLAB = 'matlab.exe'
 
 # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
 def _which(program):
