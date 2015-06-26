@@ -18,6 +18,7 @@ from fast_rcnn.config import cfg
 from fast_rcnn.test import im_detect
 from utils.cython_nms import nms
 from utils.timer import Timer
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.io as sio
@@ -33,10 +34,16 @@ CLASSES = ('__background__',
 
 NETS = {'vgg16': ('VGG16',
                   'vgg16_fast_rcnn_iter_40000.caffemodel'),
+        'vgg16_comp': ('VGG16/compressed',
+                  'vgg16_fast_rcnn_iter_40000.caffemodel'),
         'vgg_cnn_m_1024': ('VGG_CNN_M_1024',
                            'vgg_cnn_m_1024_fast_rcnn_iter_40000.caffemodel'),
+        'vgg_cnn_m_1024_comp': ('VGG_CNN_M_1024/compressed',
+                           'vgg_cnn_m_1024_fast_rcnn_iter_40000.caffemodel'),
         'caffenet': ('CaffeNet',
-                     'caffenet_fast_rcnn_iter_40000.caffemodel')}
+                     'caffenet_fast_rcnn_iter_40000.caffemodel'),
+        'caffenet_comp': ('CaffeNet/compressed',
+                     'caffenet_fast_rcnn_iter_40000_svd_fc6_1024_fc7_256.caffemodel')}
 
 
 def vis_detections(im, class_name, dets, thresh=0.5):
@@ -78,18 +85,24 @@ def demo(net, image_name, classes):
     box_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo',
                             image_name + '_boxes.mat')
     obj_proposals = sio.loadmat(box_file)['boxes']
+    
+    
+    
+    # DJDJ
+    #obj_proposals = obj_proposals[:300, ]
 
     # Load the demo image
     im_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo', image_name + '.jpg')
     im = cv2.imread(im_file)
 
     # Detect all object classes and regress object bounds
-    timer = Timer()
-    timer.tic()
-    scores, boxes = im_detect(net, im, obj_proposals)
-    timer.toc()
-    print ('Detection took {:.3f}s for '
-           '{:d} object proposals').format(timer.total_time, boxes.shape[0])
+    for i in range(1):
+        timer = Timer()
+        timer.tic()
+        scores, boxes = im_detect(net, im, obj_proposals)
+        timer.toc()
+        print ('Detection took {:.3f}s for '
+               '{:d} object proposals').format(timer.total_time, boxes.shape[0])
 
     # Visualize detections for each class
     CONF_THRESH = 0.8
@@ -150,4 +163,7 @@ if __name__ == '__main__':
     print 'Demo for data/demo/001551.jpg'
     demo(net, '001551', ('sofa', 'tvmonitor'))
 
-    plt.show()
+    #plt.show()
+    
+    
+    
