@@ -72,6 +72,11 @@ class RoIDataLayer(caffe.Layer):
         layer_params = yaml.load(self.param_str_)
 
         self._num_classes = layer_params['num_classes']
+        
+        if 'RPN' in layer_params:
+            self._RPN = True
+        else:
+            self._RPN = False            
 
         self._name_to_top_map = {
             'data': 0,
@@ -87,21 +92,37 @@ class RoIDataLayer(caffe.Layer):
         # rectangle (x1, y1, x2, y2)
         top[1].reshape(1, 5)
 
-        # labels blob: R categorical labels in [0, ..., K] for K foreground
-        # classes plus background
-        top[2].reshape(1)
+        if self._RPN:
+            # labels blob: R categorical labels in 9 anchors for the final 
+            # convolution layer
+            top[2].reshape(1, 18, 5, 5)
+        else:
+            # labels blob: R categorical labels in [0, ..., K] for K foreground
+            # classes plus background
+            top[2].reshape(1)
 
         if cfg.TRAIN.BBOX_REG:
             self._name_to_top_map['bbox_targets'] = 3
             self._name_to_top_map['bbox_loss_weights'] = 4
 
-            # bbox_targets blob: R bounding-box regression targets with 4
-            # targets per class
-            top[3].reshape(1, self._num_classes * 4)
-
-            # bbox_loss_weights blob: At most 4 targets per roi are active;
-            # thisbinary vector sepcifies the subset of active targets
-            top[4].reshape(1, self._num_classes * 4)
+            if self._RPN:
+                # bbox_targets blob: R bounding-box regression targets with 4 targets
+                #top[3].reshape(1, 4)
+                #top[3].reshape(1, 18, 5, 5)
+                top[3].reshape(25, 18)
+    
+                # bbox_loss_weights blob: At most 4 targets are active;
+                # this binary vector specifies the subset of active targets
+                top[4].reshape(1, 18, 25)
+            else:
+                # bbox_targets blob: R bounding-box regression targets with 4
+                # targets per class
+                top[3].reshape(1, self._num_classes * 4)
+    
+                # bbox_loss_weights blob: At most 4 targets per roi are active;
+                # this binary vector specifies the subset of active targets
+                top[4].reshape(1, self._num_classes * 4)
+                
 
     def forward(self, bottom, top):
         """Get blobs and copy them into this layer's top blob vector."""

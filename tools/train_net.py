@@ -45,6 +45,9 @@ def parse_args():
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
+    parser.add_argument('--proposal', dest='proposal',
+                        help='proposal to use',
+                        default='ss', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -74,9 +77,16 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     if args.gpu_id is not None:
         caffe.set_device(args.gpu_id)
+    
+    args.proposal = 'rpn'
 
-    imdb = get_imdb(args.imdb_name)
+    scale_factor = 1 / cfg.DEDUP_BOXES
+    imdb = get_imdb(args.imdb_name, args.proposal, scale_factor)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
+    
+    # DJDJ
+    #imdb.rpn_roidb()
+    
     roidb = get_training_roidb(imdb)
 
     output_dir = get_output_dir(imdb, None)

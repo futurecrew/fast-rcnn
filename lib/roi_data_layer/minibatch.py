@@ -151,15 +151,25 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
         bbox_loss_weights (ndarray): N x 4K blob of loss weights
     """
     clss = bbox_target_data[:, 0]
-    bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
-    bbox_loss_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
-    inds = np.where(clss > 0)[0]
-    for ind in inds:
-        cls = clss[ind]
-        start = 4 * cls
-        end = start + 4
-        bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
-        bbox_loss_weights[ind, start:end] = [1., 1., 1., 1.]
+    
+    if num_classes == 1:        # RPN
+        bbox_targets = np.zeros((clss.size, 4), dtype=np.float32)
+        bbox_loss_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
+        inds = np.where(clss > 0)[0]
+        for ind in inds:
+            bbox_targets[ind, :] = bbox_target_data[ind, 1:]
+            bbox_loss_weights[ind, :] = [1., 1., 1., 1.]
+    else:
+        bbox_targets = np.zeros((clss.size, 4 * num_classes), dtype=np.float32)
+        bbox_loss_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
+        inds = np.where(clss > 0)[0]
+        for ind in inds:
+            cls = clss[ind]
+            start = 4 * cls
+            end = start + 4
+            bbox_targets[ind, start:end] = bbox_target_data[ind, 1:]
+            bbox_loss_weights[ind, start:end] = [1., 1., 1., 1.]
+
     return bbox_targets, bbox_loss_weights
 
 def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):

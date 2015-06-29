@@ -18,7 +18,7 @@ import cPickle
 import subprocess
 
 class pascal_voc(datasets.imdb):
-    def __init__(self, image_set, year, devkit_path=None):
+    def __init__(self, image_set, year, proposal='ss', scale_factor=16, devkit_path=None):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
@@ -34,8 +34,13 @@ class pascal_voc(datasets.imdb):
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
+        self.scale_factor = scale_factor
+        
         # Default to roidb handler
-        self._roidb_handler = self.selective_search_roidb
+        if proposal == 'rpn':
+            self._roidb_handler = self.rpn_roidb
+        else:
+            self._roidb_handler = self.selective_search_roidb
 
         # PASCAL specific config options
         self.config = {'cleanup'  : True,
@@ -186,6 +191,74 @@ class pascal_voc(datasets.imdb):
             raw_data = sio.loadmat(filename)
             box_list.append((raw_data['boxes'][:top_k, :]-1).astype(np.uint16))
 
+        return self.create_roidb_from_box_list(box_list, gt_roidb)
+
+
+    def rpn_roidb(self):
+        """
+        Return the database of rpn regions of interest.
+        Ground-truth ROIs are also included.
+
+        This function loads/saves from/to a cache file to speed up future calls.
+        """
+        cache_file = os.path.join(self.cache_path,
+                                  self.name + '_rpn_roidb.pkl')
+
+        if os.path.exists(cache_file):
+            with open(cache_file, 'rb') as fid:
+                roidb = cPickle.load(fid)
+            print '{} rpn roidb loaded from {}'.format(self.name, cache_file)
+            return roidb
+
+        if int(self._year) == 2007 or self._image_set != 'test':
+            gt_roidb = self.gt_roidb()
+            rpn_roidb = self._load_rpn_roidb(gt_roidb)
+            roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
+        else:
+            roidb = self._load_rpn_roidb(None)
+        with open(cache_file, 'wb') as fid:
+            cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
+        print 'wrote rpn roidb to {}'.format(cache_file)
+
+        return roidb
+
+    def _load_rpn_roidb(self, gt_roidb):
+        
+        import cv2
+        
+        box_list = []
+        anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
+                   [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
+                   [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
+        
+        for index in range(self.num_images):
+            im = cv2.imread(self.image_path_at(index))
+            im_width = im.shape[0]
+            im_height = im.shape[1]
+            one_list = []
+            
+            if index % 1000 == 0:
+                print 'processing image %s' % index
+            for center_x in xrange(0, im_width, int(self.scale_factor)):
+                for center_y in xrange(0, im_height, int(self.scale_factor)):
+                    #print 'processing [%s, %s]' % (center_x, center_y)
+                    for anchor_w, anchor_h in anchors:
+                        x1 = center_x - anchor_w / 2
+                        y1 = center_y - anchor_h / 2
+                        x2 = x1 + anchor_w
+                        y2 = y1 + anchor_h
+                        
+                        if x1 < 0 or y1 < 0 or x2 > im_width or y2 > im_height:
+                            continue
+                        
+                        one_list.append(np.array([x1, y1, x2, y2]))
+                        #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
+                        
+            one_list = np.array(one_list).reshape(len(one_list), 4)
+            box_list.append(one_list)
+
+        print 'total %s boxes are generated.' % len(box_list)
+        
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
     def _load_pascal_annotation(self, index):
