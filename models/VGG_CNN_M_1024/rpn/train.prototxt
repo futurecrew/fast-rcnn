@@ -255,11 +255,11 @@ layer {
   top: "conv_rpn_score_reshape"
   reshape_param {
     shape {
-      dim: 0 
+      dim: 1 
       dim: 9
       dim: 2
-      dim: 0
-      dim: 0 
+      dim: 5
+      dim: 5 
     }
   }
 }
@@ -271,7 +271,11 @@ layer {
   bottom: "labels"
   top: "loss_cls"
   loss_weight: 1
+  softmax_param {
+    axis: 2
+  }  
 }
+
 layer {
   name: "loss_bbox"
   type: "SmoothL1Loss"

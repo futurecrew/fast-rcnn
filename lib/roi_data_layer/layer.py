@@ -95,7 +95,7 @@ class RoIDataLayer(caffe.Layer):
         if self._RPN:
             # labels blob: R categorical labels in 9 anchors for the final 
             # convolution layer
-            top[2].reshape(1, 18, 5, 5)
+            top[2].reshape(1, 9, 5, 5)
         else:
             # labels blob: R categorical labels in [0, ..., K] for K foreground
             # classes plus background
@@ -107,13 +107,11 @@ class RoIDataLayer(caffe.Layer):
 
             if self._RPN:
                 # bbox_targets blob: R bounding-box regression targets with 4 targets
-                #top[3].reshape(1, 4)
-                #top[3].reshape(1, 18, 5, 5)
-                top[3].reshape(25, 18)
+                top[3].reshape(1, 36, 5, 5)
     
                 # bbox_loss_weights blob: At most 4 targets are active;
                 # this binary vector specifies the subset of active targets
-                top[4].reshape(1, 18, 25)
+                top[4].reshape(1, 36, 5, 5)
             else:
                 # bbox_targets blob: R bounding-box regression targets with 4
                 # targets per class
