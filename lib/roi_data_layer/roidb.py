@@ -11,7 +11,7 @@ import numpy as np
 from fast_rcnn.config import cfg
 import utils.cython_bbox
 
-def prepare_roidb(imdb):
+def prepare_roidb(imdb, proposal):
     """Enrich the imdb's roidb by adding some derived quantities that
     are useful for training. This function precomputes the maximum
     overlap, taken over ground-truth boxes, between each ROI and
@@ -29,6 +29,8 @@ def prepare_roidb(imdb):
         max_classes = gt_overlaps.argmax(axis=1)
         roidb[i]['max_classes'] = max_classes
         roidb[i]['max_overlaps'] = max_overlaps
+        roidb[i]['proposal'] = proposal        
+        
         # sanity checks
         # max overlap of 0 => class should be zero (background)
         zero_inds = np.where(max_overlaps == 0)[0]

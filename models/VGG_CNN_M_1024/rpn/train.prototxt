@@ -3,7 +3,6 @@ layer {
   name: 'data'
   type: 'Python'
   top: 'data'
-  top: 'rois'
   top: 'labels'
   top: 'bbox_targets'
   top: 'bbox_loss_weights'

@@ -75,44 +75,54 @@ class RoIDataLayer(caffe.Layer):
         
         if 'RPN' in layer_params:
             self._RPN = True
-        else:
-            self._RPN = False            
+            
+            self._name_to_top_map = {
+                'data': 0,
+                'labels': 1}
 
-        self._name_to_top_map = {
-            'data': 0,
-            'rois': 1,
-            'labels': 2}
-
-        # data blob: holds a batch of N images, each with 3 channels
-        # The height and width (100 x 100) are dummy values
-        top[0].reshape(1, 3, 100, 100)
-
-        # rois blob: holds R regions of interest, each is a 5-tuple
-        # (n, x1, y1, x2, y2) specifying an image batch index n and a
-        # rectangle (x1, y1, x2, y2)
-        top[1].reshape(1, 5)
-
-        if self._RPN:
+            # data blob: holds a batch of N images, each with 3 channels
+            # The height and width (100 x 100) are dummy values
+            top[0].reshape(1, 3, 100, 100)
+    
             # labels blob: R categorical labels in 9 anchors for the final 
             # convolution layer
-            top[2].reshape(1, 9, 5, 5)
-        else:
-            # labels blob: R categorical labels in [0, ..., K] for K foreground
-            # classes plus background
-            top[2].reshape(1)
+            top[1].reshape(1, 9, 5, 5)
+    
+            if cfg.TRAIN.BBOX_REG:
+                self._name_to_top_map['bbox_targets'] = 2
+                self._name_to_top_map['bbox_loss_weights'] = 3
 
-        if cfg.TRAIN.BBOX_REG:
-            self._name_to_top_map['bbox_targets'] = 3
-            self._name_to_top_map['bbox_loss_weights'] = 4
-
-            if self._RPN:
                 # bbox_targets blob: R bounding-box regression targets with 4 targets
-                top[3].reshape(1, 36, 5, 5)
+                top[2].reshape(1, 36, 5, 5)
     
                 # bbox_loss_weights blob: At most 4 targets are active;
                 # this binary vector specifies the subset of active targets
-                top[4].reshape(1, 36, 5, 5)
-            else:
+                top[3].reshape(1, 36, 5, 5)
+        else:
+            self._RPN = False            
+
+            self._name_to_top_map = {
+                'data': 0,
+                'rois': 1,
+                'labels': 2}
+    
+            # data blob: holds a batch of N images, each with 3 channels
+            # The height and width (100 x 100) are dummy values
+            top[0].reshape(1, 3, 100, 100)
+    
+            # rois blob: holds R regions of interest, each is a 5-tuple
+            # (n, x1, y1, x2, y2) specifying an image batch index n and a
+            # rectangle (x1, y1, x2, y2)
+            top[1].reshape(1, 5)
+
+            # labels blob: R categorical labels in [0, ..., K] for K foreground
+            # classes plus background
+            top[2].reshape(1)
+    
+            if cfg.TRAIN.BBOX_REG:
+                self._name_to_top_map['bbox_targets'] = 3
+                self._name_to_top_map['bbox_loss_weights'] = 4
+
                 # bbox_targets blob: R bounding-box regression targets with 4
                 # targets per class
                 top[3].reshape(1, self._num_classes * 4)

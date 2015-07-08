@@ -16,6 +16,8 @@ import scipy.io as sio
 import utils.cython_bbox
 import cPickle
 import subprocess
+from utils.blob import im_scale_after_resize
+from fast_rcnn.config import cfg
 
 class pascal_voc(datasets.imdb):
     def __init__(self, image_set, year, proposal='ss', scale_factor=16, devkit_path=None):
@@ -233,12 +235,16 @@ class pascal_voc(datasets.imdb):
         
         for index in range(self.num_images):
             im = cv2.imread(self.image_path_at(index))
-            im_width = im.shape[0]
-            im_height = im.shape[1]
+            scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
+            
+            # Generate anchors based on the resized image
+            im_width = int(im.shape[0] * scale)
+            im_height = int(im.shape[1] * scale)
             one_list = []
             
             if index % 1000 == 0:
                 print 'processing image %s' % index
+                
             for center_x in xrange(0, im_width, int(self.scale_factor)):
                 for center_y in xrange(0, im_height, int(self.scale_factor)):
                     #print 'processing [%s, %s]' % (center_x, center_y)
@@ -250,6 +256,12 @@ class pascal_voc(datasets.imdb):
                         
                         if x1 < 0 or y1 < 0 or x2 > im_width or y2 > im_height:
                             continue
+                        
+                        # Scale back to original image
+                        x1 = x1 / scale
+                        y1 = y1 / scale
+                        x2 = x2 / scale
+                        y2 = y2 / scale
                         
                         one_list.append(np.array([x1, y1, x2, y2]))
                         #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)

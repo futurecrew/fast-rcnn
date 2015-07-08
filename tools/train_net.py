@@ -26,7 +26,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Train a Fast R-CNN network')
     parser.add_argument('--cpu', dest='cpu',
                         help='CPU',
-                        default=0, type=int)
+                        default=-1, type=int)
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
                         default=0, type=int)
@@ -93,7 +93,7 @@ if __name__ == '__main__':
     # DJDJ
     #imdb.rpn_roidb()
     
-    roidb = get_training_roidb(imdb)
+    roidb = get_training_roidb(imdb, args.proposal)
 
     output_dir = get_output_dir(imdb, None)
     print 'Output will be saved to `{:s}`'.format(output_dir)

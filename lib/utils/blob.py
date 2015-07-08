@@ -43,3 +43,15 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
                     interpolation=cv2.INTER_LINEAR)
 
     return im, im_scale
+
+def im_scale_after_resize(im, target_size, max_size):
+    """Get image scale after resize"""
+    im_shape = im.shape
+    im_size_min = np.min(im_shape[0:2])
+    im_size_max = np.max(im_shape[0:2])
+    im_scale = float(target_size) / float(im_size_min)
+    # Prevent the biggest axis from being more than MAX_SIZE
+    if np.round(im_scale * im_size_max) > max_size:
+        im_scale = float(max_size) / float(im_size_max)
+
+    return im_scale

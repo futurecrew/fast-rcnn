@@ -13,6 +13,8 @@ import cv2
 from fast_rcnn.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 
+from utils.model import last_conv_size
+
 def get_minibatch(roidb, num_classes):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
@@ -27,36 +29,74 @@ def get_minibatch(roidb, num_classes):
 
     # Get the input image blob, formatted for caffe
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
+    
+    if roidb[0]['proposal'] == 'rpn':
+        conv_h = last_conv_size(im_blob.shape[2])
+        conv_w = last_conv_size(im_blob.shape[3])
+        
+        # Now, build the region of interest and label blobs
+        rois_blob = np.zeros((0, 5), dtype=np.float32)
+        labels_blob = np.zeros((0, 9, conv_h, conv_w), dtype=np.float32)
+        bbox_targets_blob = np.zeros((0, 36, conv_h, conv_w), dtype=np.float32)
+        bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
+        # all_overlaps = []
+        for im_i in xrange(num_images):
+            labels, overlaps, im_rois, bbox_targets, bbox_loss \
+                = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
+                               num_classes)
+    
+            # DJDJ
+            labels = np.ones((1, 9, conv_h, conv_w), dtype=np.float32)
+            bbox_targets = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
+            bbox_loss = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
 
-    # Now, build the region of interest and label blobs
-    rois_blob = np.zeros((0, 5), dtype=np.float32)
-    labels_blob = np.zeros((0), dtype=np.float32)
-    bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
-    bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
-    # all_overlaps = []
-    for im_i in xrange(num_images):
-        labels, overlaps, im_rois, bbox_targets, bbox_loss \
-            = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
-                           num_classes)
-
-        # Add to RoIs blob
-        rois = _project_im_rois(im_rois, im_scales[im_i])
-        batch_ind = im_i * np.ones((rois.shape[0], 1))
-        rois_blob_this_image = np.hstack((batch_ind, rois))
-        rois_blob = np.vstack((rois_blob, rois_blob_this_image))
-
-        # Add to labels, bbox targets, and bbox loss blobs
-        labels_blob = np.hstack((labels_blob, labels))
-        bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
-        bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
-        # all_overlaps = np.hstack((all_overlaps, overlaps))
-
-    # For debug visualizations
-    # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
-
-    blobs = {'data': im_blob,
-             'rois': rois_blob,
-             'labels': labels_blob}
+            # Add to RoIs blob
+            rois = _project_im_rois(im_rois, im_scales[im_i])
+            batch_ind = im_i * np.ones((rois.shape[0], 1))
+            rois_blob_this_image = np.hstack((batch_ind, rois))
+            rois_blob = np.vstack((rois_blob, rois_blob_this_image))
+    
+            # Add to labels, bbox targets, and bbox loss blobs
+            labels_blob = np.vstack((labels_blob, labels))
+            bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
+            bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
+            # all_overlaps = np.hstack((all_overlaps, overlaps))
+            
+        # For debug visualizations
+        # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
+    
+        blobs = {'data': im_blob,
+                 'labels': labels_blob}            
+    else:
+        # Now, build the region of interest and label blobs
+        rois_blob = np.zeros((0, 5), dtype=np.float32)
+        labels_blob = np.zeros((0), dtype=np.float32)
+        bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
+        bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
+        # all_overlaps = []
+        for im_i in xrange(num_images):
+            labels, overlaps, im_rois, bbox_targets, bbox_loss \
+                = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
+                               num_classes)
+    
+            # Add to RoIs blob
+            rois = _project_im_rois(im_rois, im_scales[im_i])
+            batch_ind = im_i * np.ones((rois.shape[0], 1))
+            rois_blob_this_image = np.hstack((batch_ind, rois))
+            rois_blob = np.vstack((rois_blob, rois_blob_this_image))
+    
+            # Add to labels, bbox targets, and bbox loss blobs
+            labels_blob = np.hstack((labels_blob, labels))
+            bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
+            bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
+            # all_overlaps = np.hstack((all_overlaps, overlaps))
+        
+        # For debug visualizations
+        # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
+    
+        blobs = {'data': im_blob,
+                 'rois': rois_blob,
+                 'labels': labels_blob}
 
     if cfg.TRAIN.BBOX_REG:
         blobs['bbox_targets'] = bbox_targets_blob
