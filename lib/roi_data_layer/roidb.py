@@ -200,7 +200,38 @@ def add_bbox_regression_targets(roidb, proposal):
 
     num_images = len(roidb)
     num_classes = roidb[0]['gt_overlaps'].shape[1]
-    if proposal != 'rpn':
+    if proposal == 'rpn':
+        # Compute values needed for means and stds
+        # var(x) = E(x^2) - E(x)^2
+        class_counts = 0
+        one_sums = np.zeros((1, 4))
+        one_squared_sums = np.zeros((1, 4))
+        for im_i in xrange(num_images):
+            targets = roidb[im_i]['bbox_targets']
+            cls_inds = np.where(targets[:, 0] > 0)[0]
+            if cls_inds.size > 0:
+                class_counts += cls_inds.size
+                one_sums[0, :] += targets[cls_inds, 1:].sum(axis=0)
+                one_squared_sums[0, :] += (targets[cls_inds, 1:] ** 2).sum(axis=0)
+    
+        one_means = one_sums / class_counts
+        one_stds = np.sqrt(one_squared_sums / class_counts - one_means ** 2)
+    
+        # Normalize targets
+        for im_i in xrange(num_images):
+            targets = roidb[im_i]['bbox_targets']
+            cls_inds = np.where(targets[:, 0] > 0)[0]
+            roidb[im_i]['bbox_targets'][cls_inds, 1:] -= one_means[0, :]
+            roidb[im_i]['bbox_targets'][cls_inds, 1:] /= one_stds[0, :]
+            
+        means = np.zeros((1, 36))
+        stds = np.zeros((1, 36))
+        
+        for i in range(9):
+            means[:, i*4:i*4+4] = one_means
+            stds[:, i*4:i*4+4] = one_stds
+        
+    else:
         # Infer number of classes from the number of columns in gt_overlaps
         for im_i in xrange(num_images):
             rois = roidb[im_i]['boxes']
@@ -208,31 +239,31 @@ def add_bbox_regression_targets(roidb, proposal):
             max_classes = roidb[im_i]['max_classes']
             roidb[im_i]['bbox_targets'] = \
                     _compute_targets(rois, max_overlaps, max_classes)
-
-    # Compute values needed for means and stds
-    # var(x) = E(x^2) - E(x)^2
-    class_counts = np.zeros((num_classes, 1)) + cfg.EPS
-    sums = np.zeros((num_classes, 4))
-    squared_sums = np.zeros((num_classes, 4))
-    for im_i in xrange(num_images):
-        targets = roidb[im_i]['bbox_targets']
-        for cls in xrange(1, num_classes):
-            cls_inds = np.where(targets[:, 0] == cls)[0]
-            if cls_inds.size > 0:
-                class_counts[cls] += cls_inds.size
-                sums[cls, :] += targets[cls_inds, 1:].sum(axis=0)
-                squared_sums[cls, :] += (targets[cls_inds, 1:] ** 2).sum(axis=0)
-
-    means = sums / class_counts
-    stds = np.sqrt(squared_sums / class_counts - means ** 2)
-
-    # Normalize targets
-    for im_i in xrange(num_images):
-        targets = roidb[im_i]['bbox_targets']
-        for cls in xrange(1, num_classes):
-            cls_inds = np.where(targets[:, 0] == cls)[0]
-            roidb[im_i]['bbox_targets'][cls_inds, 1:] -= means[cls, :]
-            roidb[im_i]['bbox_targets'][cls_inds, 1:] /= stds[cls, :]
+    
+        # Compute values needed for means and stds
+        # var(x) = E(x^2) - E(x)^2
+        class_counts = np.zeros((num_classes, 1)) + cfg.EPS
+        sums = np.zeros((num_classes, 4))
+        squared_sums = np.zeros((num_classes, 4))
+        for im_i in xrange(num_images):
+            targets = roidb[im_i]['bbox_targets']
+            for cls in xrange(1, num_classes):
+                cls_inds = np.where(targets[:, 0] == cls)[0]
+                if cls_inds.size > 0:
+                    class_counts[cls] += cls_inds.size
+                    sums[cls, :] += targets[cls_inds, 1:].sum(axis=0)
+                    squared_sums[cls, :] += (targets[cls_inds, 1:] ** 2).sum(axis=0)
+    
+        means = sums / class_counts
+        stds = np.sqrt(squared_sums / class_counts - means ** 2)
+    
+        # Normalize targets
+        for im_i in xrange(num_images):
+            targets = roidb[im_i]['bbox_targets']
+            for cls in xrange(1, num_classes):
+                cls_inds = np.where(targets[:, 0] == cls)[0]
+                roidb[im_i]['bbox_targets'][cls_inds, 1:] -= means[cls, :]
+                roidb[im_i]['bbox_targets'][cls_inds, 1:] /= stds[cls, :]
 
     # These values will be needed for making predictions
     # (the predicts will need to be unnormalized and uncentered)

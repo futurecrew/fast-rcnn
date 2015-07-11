@@ -23,7 +23,7 @@ from utils.model import last_conv_size
 
 
 class pascal_voc(datasets.imdb):
-    def __init__(self, image_set, year, proposal='ss', scale_factor=16, devkit_path=None):
+    def __init__(self, image_set, year, proposal='ss', devkit_path=None):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
@@ -39,7 +39,6 @@ class pascal_voc(datasets.imdb):
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
-        self.scale_factor = scale_factor
         
         # Default to roidb handler
         if proposal == 'rpn':
@@ -91,7 +90,9 @@ class pascal_voc(datasets.imdb):
         """
         Return the default path where PASCAL VOC is expected to be installed.
         """
-        return os.path.join(datasets.ROOT_DIR, 'data', 'VOCdevkit' + self._year)
+        # DJDJ
+        #return os.path.join(datasets.ROOT_DIR, 'data', 'VOCdevkit' + self._year)
+        return os.path.join('E:/data/VOCdevkit2')
 
     def gt_roidb(self):
         """

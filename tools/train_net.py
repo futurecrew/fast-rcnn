@@ -92,10 +92,8 @@ if __name__ == '__main__':
             caffe.set_device(args.gpu_id)
     
     proposal = args.proposal
-    #proposal = 'rpn'
 
-    scale_factor = 1 / cfg.DEDUP_BOXES
-    imdb = get_imdb(args.imdb_name, proposal, scale_factor)
+    imdb = get_imdb(args.imdb_name, proposal)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     
     # DJDJ

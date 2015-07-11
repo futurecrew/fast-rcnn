@@ -161,7 +161,7 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     labels = roidb['max_classes']
     new_labels = np.zeros(labels.shape, dtype=np.int16)
     bbox_target = roidb['bbox_targets']
-    new_bbox_target = np.zeros(bbox_target.shape, dtype=np.float16)
+    new_bbox_target = np.zeros(bbox_target.shape, dtype=np.float32)
 
     conv_width = roidb['conv_width']
     conv_height = roidb['conv_height']
@@ -188,8 +188,10 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
         bg_inds = npr.choice(bg_inds, size=bg_rois_per_this_image,
                              replace=False)
 
+    # DJDJ
     new_labels[fg_inds] = 1
     new_labels[bg_inds] = 0
+    #new_labels = labels
 
     if 'rois' in roidb:
         rois = roidb['rois'][fg_inds]
@@ -209,7 +211,7 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
 
     new_bbox_target, bbox_loss_weights = \
             _get_bbox_regression_labels_rpn(new_bbox_target,
-                                        num_classes)
+                                        num_classes, labels)
 
 
     """    
@@ -343,7 +345,7 @@ def _get_bbox_regression_labels(bbox_target_data, num_classes):
 
     return bbox_targets, bbox_loss_weights
 
-def _get_bbox_regression_labels_rpn(bbox_target_data, num_classes):
+def _get_bbox_regression_labels_rpn(bbox_target_data, num_classes, labels):
     """Bounding-box regression targets are stored in a compact form in the
     roidb.
 
@@ -365,7 +367,11 @@ def _get_bbox_regression_labels_rpn(bbox_target_data, num_classes):
     #print 'len(inds) : %s' % len(inds)
 
     for ind in inds:
+        # DJDJ
         bbox_targets[ind, :] = bbox_target_data[ind, 1:]
+        #label = bbox_target_data[ind, 0] / 20.
+        #bbox_targets[ind, :] = [1. * label, 1. * label, 1. * label, 1. * label]
+        
         bbox_loss_weights[ind, :] = [1., 1., 1., 1.]
         
         #print 'bbox_targets[ind, :] : %s - %s ' % (bbox_target_data[ind, 0], bbox_targets[ind, :])

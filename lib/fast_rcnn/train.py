@@ -30,6 +30,7 @@ class SolverWrapper(object):
         self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
+        # DJDJ
         self.bbox_means, self.bbox_stds = \
                 rdl_roidb.add_bbox_regression_targets(roidb, proposal)
         print 'done'
@@ -53,15 +54,19 @@ class SolverWrapper(object):
         """
         net = self.solver.net
 
-        if cfg.TRAIN.BBOX_REG and self.proposal == 'ss':
+        if cfg.TRAIN.BBOX_REG:
             # save original values
             orig_0 = net.params['bbox_pred'][0].data.copy()
             orig_1 = net.params['bbox_pred'][1].data.copy()
 
             # scale and shift with bbox reg unnormalization; then save snapshot
+            if self.proposal == 'rpn':
+                extended_stds = self.bbox_stds[:, np.newaxis, np.newaxis, np.newaxis]
+            else:
+                extended_stds = self.bbox_stds[:, np.newaxis]
             net.params['bbox_pred'][0].data[...] = \
                     (net.params['bbox_pred'][0].data *
-                     self.bbox_stds[:, np.newaxis])
+                     extended_stds)
             net.params['bbox_pred'][1].data[...] = \
                     (net.params['bbox_pred'][1].data *
                      self.bbox_stds + self.bbox_means)
@@ -78,7 +83,7 @@ class SolverWrapper(object):
         net.save(str(filename))
         print 'Wrote snapshot to: {:s}'.format(filename)
 
-        if cfg.TRAIN.BBOX_REG and self.proposal == 'ss':
+        if cfg.TRAIN.BBOX_REG:
             # restore net to original state
             net.params['bbox_pred'][0].data[...] = orig_0
             net.params['bbox_pred'][1].data[...] = orig_1

@@ -21,13 +21,13 @@ def _selective_search_IJCV_top_k(split, year, top_k):
     imdb.config['top_k'] = top_k
     return imdb
 
-def _init_imdb(proposal, scale_factor):
+def _init_imdb(proposal):
     # Set up voc_<year>_<split> using selective search "fast" mode
     for year in ['2007', '2012']:
         for split in ['train', 'val', 'trainval', 'test']:
             name = 'voc_{}_{}'.format(year, split)
             __sets[name] = (lambda split=split, year=year:
-                    datasets.pascal_voc(split, year, proposal, scale_factor))
+                    datasets.pascal_voc(split, year, proposal))
     
     # Set up voc_<year>_<split>_top_<k> using selective search "quality" mode
     # but only returning the first k boxes
@@ -38,11 +38,11 @@ def _init_imdb(proposal, scale_factor):
                 __sets[name] = (lambda split=split, year=year, top_k=top_k:
                         _selective_search_IJCV_top_k(split, year, top_k))
 
-def get_imdb(name, proposal, scale_factor):
+def get_imdb(name, proposal='ss'):
     """Get an imdb (image database) by name."""
     
     if len(__sets) == 0:
-        _init_imdb(proposal, scale_factor)
+        _init_imdb(proposal)
     
     if not __sets.has_key(name):
         raise KeyError('Unknown dataset: {}'.format(name))
