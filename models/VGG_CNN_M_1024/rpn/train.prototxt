@@ -272,6 +272,9 @@ layer {
   loss_weight: 1
   softmax_param {
     axis: 2
+  }
+  loss_param {
+    ignore_label: -1
   }  
 }
 

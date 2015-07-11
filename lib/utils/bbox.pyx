@@ -36,6 +36,10 @@ def bbox_overlaps(
             (query_boxes[k, 3] - query_boxes[k, 1] + 1)
         )
         for n in range(N):
+            if (boxes[n, 2] - boxes[n, 0] == 0
+                or boxes[n, 3] - boxes[n, 1] == 0):
+                continue
+            
             iw = (
                 min(boxes[n, 2], query_boxes[k, 2]) -
                 max(boxes[n, 0], query_boxes[k, 0]) + 1

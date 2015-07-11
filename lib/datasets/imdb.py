@@ -177,6 +177,33 @@ class imdb(object):
                           'flipped' : False})
         return roidb
 
+    def create_roidb_from_box_list_rpn(self, box_list, gt_roidb):
+        assert len(box_list) == self.num_images, \
+                'Number of boxes must match number of ground-truth images. %s vs. %s' % (len(box_list), self.num_images)
+        roidb = []
+        for i in xrange(self.num_images):
+            boxes = box_list[i]
+            num_boxes = boxes.shape[0]
+            overlaps = np.zeros((9, self.num_classes, 61, 61), dtype=np.float32)
+
+            if gt_roidb is not None:
+                gt_boxes = gt_roidb[i]['boxes']
+                gt_classes = gt_roidb[i]['gt_classes']
+                gt_overlaps = bbox_overlaps(boxes.astype(np.float),
+                                            gt_boxes.astype(np.float))
+                argmaxes = gt_overlaps.argmax(axis=1)
+                maxes = gt_overlaps.max(axis=1)
+                I = np.where(maxes > 0)[0]
+                overlaps[I, gt_classes[argmaxes[I]]] = maxes[I]
+
+            overlaps = scipy.sparse.csr_matrix(overlaps)
+            roidb.append({'boxes' : boxes,
+                          'gt_classes' : np.zeros((9, 61, 61),
+                                                  dtype=np.int32),
+                          'gt_overlaps' : overlaps,
+                          'flipped' : False})
+        return roidb
+
     @staticmethod
     def merge_roidbs(a, b):
         assert len(a) == len(b)

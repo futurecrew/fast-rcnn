@@ -12,6 +12,13 @@ def last_conv_size(input_size, model='VGG_CNN_M_1024'):
     conv2 = conv_size(1, 5, 2, pool1)
     pool2 = pool_size(0, 3, 2, conv2)
     
-    return pool2
+    scale = input_size / pool2
     
+    return int(pool2), scale
+    
+    
+if __name__ == '__main__':
+    print last_conv_size(600)
+    print last_conv_size(901)
+    print last_conv_size(1000)
     

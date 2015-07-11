@@ -19,6 +19,9 @@ import subprocess
 from utils.blob import im_scale_after_resize
 from fast_rcnn.config import cfg
 
+from utils.model import last_conv_size
+
+
 class pascal_voc(datasets.imdb):
     def __init__(self, image_set, year, proposal='ss', scale_factor=16, devkit_path=None):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
@@ -97,7 +100,10 @@ class pascal_voc(datasets.imdb):
         This function loads/saves from/to a cache file to speed up future calls.
         """
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
-        if os.path.exists(cache_file):
+        
+        # DJDJ
+        #if os.path.exists(cache_file):
+        if False:
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
             print '{} gt roidb loaded from {}'.format(self.name, cache_file)
@@ -206,7 +212,9 @@ class pascal_voc(datasets.imdb):
         cache_file = os.path.join(self.cache_path,
                                   self.name + '_rpn_roidb.pkl')
 
-        if os.path.exists(cache_file):
+        # DJDJ
+        #if os.path.exists(cache_file):
+        if False:
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
             print '{} rpn roidb loaded from {}'.format(self.name, cache_file)
@@ -214,8 +222,11 @@ class pascal_voc(datasets.imdb):
 
         if int(self._year) == 2007 or self._image_set != 'test':
             gt_roidb = self.gt_roidb()
-            rpn_roidb = self._load_rpn_roidb(gt_roidb)
-            roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
+            
+            roidb = gt_roidb
+            
+            #rpn_roidb = self._load_rpn_roidb(gt_roidb)
+            #roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
         else:
             roidb = self._load_rpn_roidb(None)
         with open(cache_file, 'wb') as fid:
@@ -228,50 +239,61 @@ class pascal_voc(datasets.imdb):
         
         import cv2
         
-        box_list = []
+        # 61 is conv size of image size of 1,000
+        box_list = np.zeros((self.num_images, 9, 4, 61, 61), dtype=np.int32)
+        
         anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
                    [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
                    [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
         
         for index in range(self.num_images):
             im = cv2.imread(self.image_path_at(index))
-            scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
+            resize_scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
             
             # Generate anchors based on the resized image
-            im_width = int(im.shape[0] * scale)
-            im_height = int(im.shape[1] * scale)
+            im_width = int(im.shape[0] * resize_scale)
+            im_height = int(im.shape[1] * resize_scale)
+            
+            conv_width, scale_width = last_conv_size(im_width)
+            conv_height, scale_height = last_conv_size(im_height)
+            
             one_list = []
             
             if index % 1000 == 0:
                 print 'processing image %s' % index
-                
-            for center_x in xrange(0, im_width, int(self.scale_factor)):
-                for center_y in xrange(0, im_height, int(self.scale_factor)):
+            
+            for center_x in xrange(0, conv_width):
+                for center_y in xrange(0, conv_height):
                     #print 'processing [%s, %s]' % (center_x, center_y)
+
+                    anchor_i = -1
                     for anchor_w, anchor_h in anchors:
-                        x1 = center_x - anchor_w / 2
-                        y1 = center_y - anchor_h / 2
+                        x1 = center_x * scale_width - anchor_w / 2
+                        y1 = center_y * scale_height - anchor_h / 2
                         x2 = x1 + anchor_w
                         y2 = y1 + anchor_h
+                        
+                        anchor_i += 1
                         
                         if x1 < 0 or y1 < 0 or x2 > im_width or y2 > im_height:
                             continue
                         
                         # Scale back to original image
-                        x1 = x1 / scale
-                        y1 = y1 / scale
-                        x2 = x2 / scale
-                        y2 = y2 / scale
+                        x1 = x1 / resize_scale
+                        y1 = y1 / resize_scale
+                        x2 = x2 / resize_scale
+                        y2 = y2 / resize_scale
                         
-                        one_list.append(np.array([x1, y1, x2, y2]))
+                        #one_list.append(np.array([x1, y1, x2, y2]))
+                        box_list[index, anchor_i, ::, center_y, center_x] = x1, y1, x2, y1
                         #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
-                        
-            one_list = np.array(one_list).reshape(len(one_list), 4)
-            box_list.append(one_list)
+                                                
+            #one_list = np.array(one_list).reshape(len(one_list), 4)
+            #box_list.append(one_list)
 
         print 'total %s boxes are generated.' % len(box_list)
         
-        return self.create_roidb_from_box_list(box_list, gt_roidb)
+        return self.create_roidb_from_box_list_rpn(box_list, gt_roidb)
 
     def _load_pascal_annotation(self, index):
         """

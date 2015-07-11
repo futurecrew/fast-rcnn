@@ -24,20 +24,24 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, roidb, output_dir,
-                 pretrained_model=None):
+                 pretrained_model=None, proposal='ss'):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
 
         print 'Computing bounding-box regression targets...'
         self.bbox_means, self.bbox_stds = \
-                rdl_roidb.add_bbox_regression_targets(roidb)
+                rdl_roidb.add_bbox_regression_targets(roidb, proposal)
         print 'done'
 
         self.solver = caffe.SGDSolver(solver_prototxt)
+        
+        # DJDJ
+        """
         if pretrained_model is not None:
             print ('Loading pretrained model '
                    'weights from {:s}').format(pretrained_model)
             self.solver.net.copy_from(pretrained_model)
+        """
 
         self.solver_param = caffe_pb2.SolverParameter()
         with open(solver_prototxt, 'rt') as f:
@@ -108,16 +112,21 @@ def get_training_roidb(imdb, proposal):
         print 'done'
 
     print 'Preparing training data...'
-    rdl_roidb.prepare_roidb(imdb, proposal)
+    if proposal == 'rpn':
+        rdl_roidb.prepare_roidb_rpn(imdb)
+    else:
+        rdl_roidb.prepare_roidb(imdb)
     print 'done'
 
     return imdb.roidb
 
 def train_net(solver_prototxt, roidb, output_dir,
-              pretrained_model=None, max_iters=40000):
+              pretrained_model=None, max_iters=40000,
+              proposal='ss'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,
-                       pretrained_model=pretrained_model)
+                       pretrained_model=pretrained_model,
+                       proposal=proposal)
 
     print 'Solving...'
     sw.train_model(max_iters)

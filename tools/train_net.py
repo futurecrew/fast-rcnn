@@ -84,10 +84,11 @@ if __name__ == '__main__':
         if args.gpu_id is not None:
             caffe.set_device(args.gpu_id)
     
-    #args.proposal = 'rpn'
+    proposal = args.proposal
+    #proposal = 'rpn'
 
     scale_factor = 1 / cfg.DEDUP_BOXES
-    imdb = get_imdb(args.imdb_name, args.proposal, scale_factor)
+    imdb = get_imdb(args.imdb_name, proposal, scale_factor)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     
     # DJDJ
@@ -100,4 +101,5 @@ if __name__ == '__main__':
 
     train_net(args.solver, roidb, output_dir,
               pretrained_model=args.pretrained_model,
-              max_iters=args.max_iters)
+              max_iters=args.max_iters,
+              proposal=proposal)
