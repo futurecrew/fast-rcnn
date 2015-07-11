@@ -51,41 +51,44 @@ def prepare_roidb_rpn(imdb):
     recorded.
     """
     roidb = imdb.roidb
+
+    anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
+               [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
+               [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
+    
+    
     for i in xrange(len(imdb.image_index)):
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         gt_boxes = roidb[i]['boxes']
         gt_classes = roidb[i]['gt_classes']
-        
-        # 61 is conv size of image size of 1,000
-        labels = np.zeros((9 * 61 * 61), dtype=np.int16)
-        labels.fill(-1)
-        
-        # indexes for ground true rectangles
-        gt_indexes = np.zeros((9 * 61 * 61), dtype=np.int16)
-        gt_indexes.fill(-1)
-
-        rois = np.zeros((9 * 61 * 61, 4), dtype=np.float16)
-        gt_rois = np.zeros((9 * 61 * 61, 4), dtype=np.float16)
-        boxes = np.zeros((9, 4), dtype=np.int32)
-        
-        anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
-                   [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
-                   [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
     
         im = cv2.imread(image_path)
         resize_scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
         
         # Generate anchors based on the resized image
-        im_width = int(im.shape[0] * resize_scale)
-        im_height = int(im.shape[1] * resize_scale)
+        im_height = int(im.shape[0] * resize_scale)
+        im_width = int(im.shape[1] * resize_scale)
         
-        conv_width, scale_width = last_conv_size(im_width)
         conv_height, scale_height = last_conv_size(im_height)
+        conv_width, scale_width = last_conv_size(im_width)
+        
+        resized_gt_boxes = gt_boxes * resize_scale
+        
+        labels = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
+        labels.fill(-1)
+        
+        # indexes for ground true rectangles
+        gt_indexes = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
+        gt_indexes.fill(-1)
+
+        rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
+        gt_rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
+        boxes = np.zeros((9, 4), dtype=np.int32)
         
         
-        #if i % 100 == 0:
-        print 'processing image %s' % i
+        if i % 100 == 0:
+            print 'processing image %s' % i
         
         for center_y in xrange(0, conv_height):
             for center_x in xrange(0, conv_width):
@@ -104,18 +107,12 @@ def prepare_roidb_rpn(imdb):
                     if x1 < 0 or y1 < 0 or x2 > im_width or y2 > im_height:
                         continue
                     
-                    # Scale back to original image
-                    x1 = x1 / resize_scale
-                    y1 = y1 / resize_scale
-                    x2 = x2 / resize_scale
-                    y2 = y2 / resize_scale
-                    
                     boxes[anchor_i, :] = x1, y1, x2, y2
                     
                     #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
                 
                 gt_overlaps = bbox_overlaps(boxes.astype(np.float),
-                                            gt_boxes.astype(np.float))
+                                            resized_gt_boxes.astype(np.float))
                 argmaxes = gt_overlaps.argmax(axis=1)
                 maxes = gt_overlaps.max(axis=1)
                 
@@ -124,25 +121,12 @@ def prepare_roidb_rpn(imdb):
                 
                 if len(I) > 0:
                     # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
-                    base_index = I * 61 * 61 + center_y * 61 + center_x
+                    base_index = I * conv_height * conv_width + center_y * conv_width + center_x
                     labels[base_index] = gt_classes[argmaxes[I]]
                     gt_indexes[base_index] = argmaxes[I]
 
                     # set box rectangles when a box of overlapping area if bigger than FG_THRESH
                     rois[base_index] = boxes[I]
-
-                I = np.where(maxes > 0)[0]
-                if len(I) > 0:
-                    max_of_maxes = np.argmax(maxes)
-                
-                    # set label to 1 when a box has the biggest area among the 9 boxes 
-                    base_index = max_of_maxes * 61 * 61 + center_y * 61 + center_x
-                    labels[base_index] = gt_classes[argmaxes[max_of_maxes]]
-                    gt_indexes[base_index] = argmaxes[max_of_maxes]
-                    
-                    # set box rectangles when a box has the biggest area among the 9 boxes
-                    rois[base_index] = boxes[max_of_maxes]
-                    
 
                 # For negative train data
                 I = np.where((maxes > cfg.TRAIN.BG_THRESH_LO) & 
@@ -150,15 +134,26 @@ def prepare_roidb_rpn(imdb):
                 
                 if len(I) > 0:
                     # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
-                    base_index = I * 61 * 61 + center_y * 61 + center_x
+                    base_index = I * conv_height * conv_width + center_y * conv_width + center_x
                     labels[base_index] = 0
                     gt_indexes[base_index] = -1
 
-                    # DJDJ
-                    #rois[base_index] = boxes[I]
+
+                # set label to 1 when a box has the biggest area among the 9 boxes 
+                I = np.where(maxes > 0)[0]
+                if len(I) > 0:
+                    max_of_maxes = np.argmax(maxes)
+                
+                    base_index = max_of_maxes * conv_height * conv_width + center_y * conv_width + center_x
+                    labels[base_index] = gt_classes[argmaxes[max_of_maxes]]
+                    gt_indexes[base_index] = argmaxes[max_of_maxes]
+                    
+                    # set box rectangles when a box has the biggest area among the 9 boxes
+                    rois[base_index] = boxes[max_of_maxes]
+                    
                     
         
-        bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, gt_boxes)
+        bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
         
         # convert all the positive data labels to 1 and all the negative 
         pos_index = np.where(labels > 0)[0]
@@ -182,6 +177,10 @@ def prepare_roidb_rpn(imdb):
         roidb[i]['max_classes'] = labels
         roidb[i]['bbox_targets'] = bbox_targets
         roidb[i]['proposal'] = 'rpn'        
+        #roidb[i]['rois'] = rois
+        roidb[i]['resized_gt_boxes'] = resized_gt_boxes
+        roidb[i]['conv_width'] = conv_width
+        roidb[i]['conv_height'] = conv_height
         roidb[i]['conv_scale_width'] = scale_width
         roidb[i]['conv_scale_height'] = scale_height
         

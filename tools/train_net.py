@@ -18,6 +18,8 @@ import argparse
 import pprint
 import numpy as np
 import sys
+from util import prevent_sleep
+import os
 
 def parse_args():
     """
@@ -75,6 +77,11 @@ if __name__ == '__main__':
         # fix the random seeds (numpy and caffe) for reproducibility
         np.random.seed(cfg.RNG_SEED)
         caffe.set_random_seed(cfg.RNG_SEED)
+
+    prevent_sleep()
+    
+    #os.environ['GLOG_log_dir'] = 'experiments/logs/' + cfg.EXP_DIR
+    #print os.environ['GLOG_log_dir']
 
     # set up caffe
     if args.cpu == 0:

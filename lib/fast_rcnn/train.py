@@ -27,6 +27,7 @@ class SolverWrapper(object):
                  pretrained_model=None, proposal='ss'):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
+        self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
         self.bbox_means, self.bbox_stds = \
@@ -35,27 +36,24 @@ class SolverWrapper(object):
 
         self.solver = caffe.SGDSolver(solver_prototxt)
         
-        # DJDJ
-        """
         if pretrained_model is not None:
             print ('Loading pretrained model '
                    'weights from {:s}').format(pretrained_model)
             self.solver.net.copy_from(pretrained_model)
-        """
 
         self.solver_param = caffe_pb2.SolverParameter()
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
 
         self.solver.net.layers[0].set_roidb(roidb)
-
+        
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
         bounding-box regression weights. This enables easy use at test-time.
         """
         net = self.solver.net
 
-        if cfg.TRAIN.BBOX_REG:
+        if cfg.TRAIN.BBOX_REG and self.proposal == 'ss':
             # save original values
             orig_0 = net.params['bbox_pred'][0].data.copy()
             orig_1 = net.params['bbox_pred'][1].data.copy()
@@ -80,7 +78,7 @@ class SolverWrapper(object):
         net.save(str(filename))
         print 'Wrote snapshot to: {:s}'.format(filename)
 
-        if cfg.TRAIN.BBOX_REG:
+        if cfg.TRAIN.BBOX_REG and self.proposal == 'ss':
             # restore net to original state
             net.params['bbox_pred'][0].data[...] = orig_0
             net.params['bbox_pred'][1].data[...] = orig_1

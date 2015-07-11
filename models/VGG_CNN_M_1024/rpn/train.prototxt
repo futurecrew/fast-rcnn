@@ -6,6 +6,7 @@ layer {
   top: 'labels'
   top: 'bbox_targets'
   top: 'bbox_loss_weights'
+  top: 'batch_size'
   python_param {
     module: 'roi_data_layer.layer'
     layer: 'RoIDataLayer'
@@ -229,10 +230,10 @@ layer {
   }
 }
 layer {
-  name: "conv_rpn_coord"
+  name: "bbox_pred"
   type: "Convolution"
   bottom: "conv_rpn_feature"
-  top: "conv_rpn_coord"
+  top: "bbox_pred"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -281,9 +282,10 @@ layer {
 layer {
   name: "loss_bbox"
   type: "SmoothL1Loss"
-  bottom: "conv_rpn_coord"
+  bottom: "bbox_pred"
   bottom: "bbox_targets"
   bottom: "bbox_loss_weights"
+  bottom: "batch_size"
   top: "loss_bbox"
   loss_weight: 10
 }

@@ -98,6 +98,11 @@ class RoIDataLayer(caffe.Layer):
                 # bbox_loss_weights blob: At most 4 targets are active;
                 # this binary vector specifies the subset of active targets
                 top[3].reshape(1, 36, 5, 5)
+                
+                top[4].reshape(1)
+                batch_size_data = np.zeros((1, 1))
+                batch_size_data[0, 0] = cfg.TRAIN.BATCH_SIZE
+                top[4].data[...] = batch_size_data
         else:
             self._RPN = False            
 

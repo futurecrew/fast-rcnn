@@ -53,9 +53,10 @@ def get_minibatch(roidb, num_classes):
             """
 
             # Add to RoIs blob
-            batch_ind = im_i * np.ones((im_rois.shape[0], 1))
-            rois_blob_this_image = np.hstack((batch_ind, im_rois))
-            rois_blob = np.vstack((rois_blob, rois_blob_this_image))
+            if im_rois != None:
+                batch_ind = im_i * np.ones((im_rois.shape[0], 1))
+                rois_blob_this_image = np.hstack((batch_ind, im_rois))
+                rois_blob = np.vstack((rois_blob, rois_blob_this_image))
     
             # Add to labels, bbox targets, and bbox loss blobs
             labels_blob = np.vstack((labels_blob, labels))
@@ -63,7 +64,7 @@ def get_minibatch(roidb, num_classes):
             bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
             
         # For debug visualizations
-        #_vis_minibatch_rpn(im_blob, rois_blob, labels_blob, None, bbox_targets_blob, bbox_loss_blob)
+        #_vis_minibatch_rpn(im_blob, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob)
     
         blobs = {'data': im_blob,
                  'labels': labels_blob}            
@@ -152,7 +153,7 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     return labels, overlaps, rois, bbox_targets, bbox_loss_weights
 
 def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes, 
-                 conv_h, conv_w):
+                 union_conv_height, union_conv_width):
     """Generate a random sample of RoIs comprising foreground and background
     examples.
     """
@@ -161,6 +162,9 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     new_labels = np.zeros(labels.shape, dtype=np.int16)
     bbox_target = roidb['bbox_targets']
     new_bbox_target = np.zeros(bbox_target.shape, dtype=np.float16)
+
+    conv_width = roidb['conv_width']
+    conv_height = roidb['conv_height']
 
     # Select foreground RoIs as those with >= FG_THRESH overlap
     fg_inds = np.where(labels > 0)[0]
@@ -187,6 +191,11 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     new_labels[fg_inds] = 1
     new_labels[bg_inds] = 0
 
+    if 'rois' in roidb:
+        rois = roidb['rois'][fg_inds]
+    else:
+        rois = None
+        
     """
     print 'labels.shape %s' % labels.shape
     print 'bbox_target.shape %s' % (bbox_target.shape, )
@@ -203,11 +212,11 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
                                         num_classes)
 
 
-    
+    """    
     print 'label no 1 : %s' % len(np.where(new_labels == 1)[0])
-    print 'new_bbox_target no 1 : %s' % len(np.where(new_bbox_target > 0)[0])
+    print 'new_bbox_target no 1 : %s' % len(np.where(new_bbox_target != 0)[0])
     print 'bbox_loss_weights no 1 : %s' % len(np.where(bbox_loss_weights > 0)[0])
-
+    """
 
     """
     # DJDJ
@@ -216,17 +225,25 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     bbox_loss = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
     """
 
-    new_labels = new_labels.reshape((1, 9, 61, 61))
+    new_labels = new_labels.reshape((1, 9, conv_height, conv_width))
 
-    new_bbox_target = new_bbox_target.reshape((1, 9, 61, 61, 4))
+    new_bbox_target = new_bbox_target.reshape((1, 9, conv_height, conv_width, 4))
     new_bbox_target = new_bbox_target.transpose(0, 1, 4, 2, 3)
-    new_bbox_target = new_bbox_target.reshape((1, 36, 61, 61))
+    new_bbox_target = new_bbox_target.reshape((1, 36, conv_height, conv_width))
     
-    bbox_loss_weights = bbox_loss_weights.reshape((1, 9, 61, 61, 4))
+    bbox_loss_weights = bbox_loss_weights.reshape((1, 9, conv_height, conv_width, 4))
     bbox_loss_weights = bbox_loss_weights.transpose(0, 1, 4, 2, 3)
-    bbox_loss_weights = bbox_loss_weights.reshape((1, 36, 61, 61))
+    bbox_loss_weights = bbox_loss_weights.reshape((1, 36, conv_height, conv_width))
     
-        
+    output_labels = np.zeros((1, 9, union_conv_height, union_conv_width))
+    output_bbox_targets = np.zeros((1, 36, union_conv_height, union_conv_width))
+    output_bbox_loss_weights = np.zeros((1, 36, union_conv_height, union_conv_width))
+    
+    output_labels[:, :, 0:conv_height, 0:conv_width] = new_labels   
+    output_bbox_targets[:, :, 0:conv_height, 0:conv_width] = new_bbox_target   
+    output_bbox_loss_weights[:, :, 0:conv_height, 0:conv_width] = bbox_loss_weights   
+    
+    """
     # Generate positive rois based on index for debugging
     anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
                [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
@@ -237,9 +254,9 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
 
     rois = np.zeros((len(fg_inds), 4), dtype=np.int16)
     for i, fg_ind in enumerate(fg_inds):
-        center_x = fg_ind % 61
-        center_y = (fg_ind - center_x) / 61 % 61
-        anchor = fg_ind / 61 / 61
+        center_x = fg_ind % conv_width
+        center_y = (fg_ind - center_x) / conv_width % conv_height
+        anchor = fg_ind / conv_height / conv_width
         
         anchor_w = anchors[anchor][0]
         anchor_h = anchors[anchor][1]
@@ -250,17 +267,9 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
         y2 = y1 + anchor_h
         
         rois[i, :] = x1, y1, x2, y2
+    """
     
     
-    # Trim out of image boundary data 
-    new_labels = np.delete(new_labels, np.s_[conv_h:61], axis=2)
-    new_labels = np.delete(new_labels, np.s_[conv_w:61], axis=3)
-
-    new_bbox_target = np.delete(new_bbox_target, np.s_[conv_h:61], axis=2)
-    new_bbox_target = np.delete(new_bbox_target, np.s_[conv_w:61], axis=3)
-
-    bbox_loss_weights = np.delete(bbox_loss_weights, np.s_[conv_h:61], axis=2)
-    bbox_loss_weights = np.delete(bbox_loss_weights, np.s_[conv_w:61], axis=3)
 
     """
     pos_labels = np.where(new_labels == 1)
@@ -273,11 +282,13 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
         i += 1
     """
     
-    print 'label no 2 : %s' % len(np.where(new_labels == 1)[0])
-    print 'new_bbox_target no 2 : %s' % len(np.where(new_bbox_target > 0)[0])
-    print 'bbox_loss_weights no 2 : %s' % len(np.where(bbox_loss_weights > 0)[0])
+    """
+    print 'label no 2 : %s' % len(np.where(output_labels == 1)[0])
+    print 'new_bbox_target no 2 : %s' % len(np.where(output_bbox_targets != 0)[0])
+    print 'bbox_loss_weights no 2 : %s' % len(np.where(output_bbox_loss_weights > 0)[0])
+    """
         
-    return new_labels, None, rois, new_bbox_target, bbox_loss_weights
+    return output_labels, None, rois, output_bbox_targets, output_bbox_loss_weights
 
 def _get_image_blob(roidb, scale_inds):
     """Builds an input blob from the images in the roidb at the specified
@@ -350,14 +361,14 @@ def _get_bbox_regression_labels_rpn(bbox_target_data, num_classes):
     bbox_loss_weights = np.zeros(bbox_targets.shape, dtype=np.float32)
     inds = np.where(clss > 0)[0]
 
-    print ''
-    print 'len(inds) : %s' % len(inds)
+    #print ''
+    #print 'len(inds) : %s' % len(inds)
 
     for ind in inds:
         bbox_targets[ind, :] = bbox_target_data[ind, 1:]
         bbox_loss_weights[ind, :] = [1., 1., 1., 1.]
         
-        print 'bbox_targets[ind, :] : %s - %s ' % (bbox_target_data[ind, 0], bbox_targets[ind, :])
+        #print 'bbox_targets[ind, :] : %s - %s ' % (bbox_target_data[ind, 0], bbox_targets[ind, :])
 
     return bbox_targets, bbox_loss_weights
 
@@ -382,20 +393,30 @@ def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
             )
         plt.show()
 
-def _vis_minibatch_rpn(im_blob, rois_blob, labels_blob, overlaps, bbox_targets_blob, bbox_loss_blob):
+def _vis_minibatch_rpn(im_blob, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob):
     """Visualize a mini-batch for debugging."""
     import matplotlib.pyplot as plt
     for i in xrange(rois_blob.shape[0]):
         rois = rois_blob[i, :]
         im_ind = rois[0]
         roi = rois[1:]
+        resized_gt_boxes = roidb[int(im_ind)]['resized_gt_boxes']
         im = im_blob[im_ind, :, :, :].transpose((1, 2, 0)).copy()
         im += cfg.PIXEL_MEANS
         im = im[:, :, (2, 1, 0)]
         im = im.astype(np.uint8)
         #cls = labels_blob[i]
         plt.imshow(im)
-        #print 'rois: ', rois
+        
+        for resized_gt_box in resized_gt_boxes:
+            resized_gt_box = resized_gt_box.astype(np.int)
+            plt.gca().add_patch(
+                plt.Rectangle((resized_gt_box[0], resized_gt_box[1]), resized_gt_box[2] - resized_gt_box[0],
+                              resized_gt_box[3] - resized_gt_box[1], fill=False,
+                              edgecolor='g', linewidth=3)
+                )
+        
+        print 'roid : %s' % roi
         plt.gca().add_patch(
             plt.Rectangle((roi[0], roi[1]), roi[2] - roi[0],
                           roi[3] - roi[1], fill=False,
