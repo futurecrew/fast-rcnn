@@ -95,7 +95,7 @@ def prepare_roidb_rpn(imdb):
                 #print 'processing [%s, %s]' % (center_y, center_x)
 
                 anchor_i = -1
-                boxes.fill(0)
+                boxes.fill(-1)
                 for anchor_w, anchor_h in anchors:
                     x1 = center_x * scale_width - anchor_w / 2
                     y1 = center_y * scale_height - anchor_h / 2
@@ -218,11 +218,12 @@ def add_bbox_regression_targets(roidb, proposal):
         one_stds = np.sqrt(one_squared_sums / class_counts - one_means ** 2)
     
         # Normalize targets
-        for im_i in xrange(num_images):
-            targets = roidb[im_i]['bbox_targets']
-            cls_inds = np.where(targets[:, 0] > 0)[0]
-            roidb[im_i]['bbox_targets'][cls_inds, 1:] -= one_means[0, :]
-            roidb[im_i]['bbox_targets'][cls_inds, 1:] /= one_stds[0, :]
+        if cfg.TRAIN.NORMALIZE_BBOX:
+            for im_i in xrange(num_images):
+                targets = roidb[im_i]['bbox_targets']
+                cls_inds = np.where(targets[:, 0] > 0)[0]
+                roidb[im_i]['bbox_targets'][cls_inds, 1:] -= one_means[0, :]
+                roidb[im_i]['bbox_targets'][cls_inds, 1:] /= one_stds[0, :]
             
         means = np.zeros((1, 36))
         stds = np.zeros((1, 36))
@@ -338,11 +339,32 @@ def _compute_targets_rpn(rois, labels, gt_indexes, gt_boxes):
     gt_ctr_x = gt_rois[:, 0] + 0.5 * gt_widths
     gt_ctr_y = gt_rois[:, 1] + 0.5 * gt_heights
 
-    targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
-    targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
-    targets_dw = np.log(gt_widths / ex_widths)
-    targets_dh = np.log(gt_heights / ex_heights)
+    print 'rois[6510] : %s' % rois[6510]
+    print 'gt_boxes[0] : %s' % gt_boxes[0]
+    
+    roi_width_temp = rois[6510][2] - rois[6510][0]
+    roi_height_temp = rois[6510][3] - rois[6510][1]
+    roi_ctr_x_temp = rois[6510][0] + roi_width_temp / 2
+    
+    gt_width_temp = gt_boxes[0][2] - gt_boxes[0][0]
+    gt_height_temp = gt_boxes[0][3] - gt_boxes[0][1]
+    gt_ctr_x_temp = gt_boxes[0][0] + gt_width_temp / 2
+    
+    print 'gt ctr_x - ex ctr_x : %s' % (gt_ctr_x_temp - roi_ctr_x_temp)
+    print 'gt width / ex width : %s' % (gt_width_temp / roi_width_temp)
 
+
+    if cfg.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET:
+        targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
+        targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
+        targets_dw = np.log(gt_widths / ex_widths)
+        targets_dh = np.log(gt_heights / ex_heights)
+    else:
+        targets_dx = gt_ctr_x - ex_ctr_x
+        targets_dy = gt_ctr_y - ex_ctr_y
+        targets_dw = gt_widths / ex_widths
+        targets_dh = gt_heights / ex_heights
+        
     targets = np.zeros((rois.shape[0], 5), dtype=np.float32)
     targets[ex_inds, 0] = gt_lables
     targets[ex_inds, 1] = targets_dx

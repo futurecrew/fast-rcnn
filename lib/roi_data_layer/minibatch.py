@@ -30,7 +30,7 @@ def get_minibatch(roidb, num_classes):
     # Get the input image blob, formatted for caffe
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
     
-    if roidb[0]['proposal'] == 'rpn':
+    if 'proposal' in roidb[0] and roidb[0]['proposal'] == 'rpn':
         conv_h, scale_h = last_conv_size(im_blob.shape[2])
         conv_w, scale_w = last_conv_size(im_blob.shape[3])
         
@@ -160,6 +160,7 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     # label = class RoI has max overlap with
     labels = roidb['max_classes']
     new_labels = np.zeros(labels.shape, dtype=np.int16)
+    new_labels.fill(-1)
     bbox_target = roidb['bbox_targets']
     new_bbox_target = np.zeros(bbox_target.shape, dtype=np.float32)
 
@@ -175,6 +176,10 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     if fg_inds.size > 0:
         fg_inds = npr.choice(fg_inds, size=fg_rois_per_this_image,
                              replace=False)
+        
+
+    # DJDJ
+    #fg_inds = [6510]        
 
     # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
     bg_inds = np.where(labels == 0)[0]
@@ -241,9 +246,24 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     output_bbox_targets = np.zeros((1, 36, union_conv_height, union_conv_width))
     output_bbox_loss_weights = np.zeros((1, 36, union_conv_height, union_conv_width))
     
+    output_labels.fill(-1)
     output_labels[:, :, 0:conv_height, 0:conv_width] = new_labels   
     output_bbox_targets[:, :, 0:conv_height, 0:conv_width] = new_bbox_target   
     output_bbox_loss_weights[:, :, 0:conv_height, 0:conv_width] = bbox_loss_weights   
+    
+    """
+    for fg_ind in fg_inds:
+        if fg_ind == 6510:  
+            axis1 = fg_ind / conv_height / conv_width
+            axis2 = fg_ind / conv_width % conv_height
+            axis3 = fg_ind % conv_width
+            print ''
+            print 'conv_size : %s, %s' % (conv_height, conv_width)
+            print 'axis : %s, %s, %s' % (axis1, axis2, axis3)
+            print 'output_labels[%s] : %s' % (fg_ind, output_labels[0, axis1, axis2, axis3])
+            print 'output_bbox_targets[%s] : %s' % (fg_ind, output_bbox_targets[0, axis1*4:axis1*4+4, axis2, axis3])
+            print 'output_bbox_loss_weights[%s] : %s' % (fg_ind, output_bbox_loss_weights[0, axis1*4:axis1*4+4, axis2, axis3])
+    """
     
     """
     # Generate positive rois based on index for debugging

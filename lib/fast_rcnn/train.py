@@ -30,7 +30,6 @@ class SolverWrapper(object):
         self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
-        # DJDJ
         self.bbox_means, self.bbox_stds = \
                 rdl_roidb.add_bbox_regression_targets(roidb, proposal)
         print 'done'
@@ -59,17 +58,18 @@ class SolverWrapper(object):
             orig_0 = net.params['bbox_pred'][0].data.copy()
             orig_1 = net.params['bbox_pred'][1].data.copy()
 
-            # scale and shift with bbox reg unnormalization; then save snapshot
-            if self.proposal == 'rpn':
-                extended_stds = self.bbox_stds[:, np.newaxis, np.newaxis, np.newaxis]
-            else:
-                extended_stds = self.bbox_stds[:, np.newaxis]
-            net.params['bbox_pred'][0].data[...] = \
-                    (net.params['bbox_pred'][0].data *
-                     extended_stds)
-            net.params['bbox_pred'][1].data[...] = \
-                    (net.params['bbox_pred'][1].data *
-                     self.bbox_stds + self.bbox_means)
+            if cfg.TRAIN.NORMALIZE_BBOX:
+                # scale and shift with bbox reg unnormalization; then save snapshot
+                if self.proposal == 'rpn':
+                    extended_stds = self.bbox_stds[:, np.newaxis, np.newaxis, np.newaxis]
+                else:
+                    extended_stds = self.bbox_stds[:, np.newaxis]
+                net.params['bbox_pred'][0].data[...] = \
+                        (net.params['bbox_pred'][0].data *
+                         extended_stds)
+                net.params['bbox_pred'][1].data[...] = \
+                        (net.params['bbox_pred'][1].data *
+                         self.bbox_stds + self.bbox_means)
 
         if not os.path.exists(self.output_dir):
             os.makedirs(self.output_dir)
@@ -97,6 +97,17 @@ class SolverWrapper(object):
             timer.tic()
             self.solver.step(1)
             timer.toc()
+            
+            """
+            axis1 = 3
+            axis2 = 10
+            axis3 = 20
+            for i in range(len(self.solver.net.blobs['bbox_pred'].data)):
+                pred = self.solver.net.blobs['bbox_pred'].data[i, axis1*4:axis1*4+4, axis2, axis3]
+                print 'pred[%s] : %s' % (i, pred)
+            """
+            
+            
             if self.solver.iter % (10 * self.solver_param.display) == 0:
                 print 'speed: {:.3f}s / iter'.format(timer.average_time)
 

@@ -99,6 +99,8 @@ if __name__ == '__main__':
     # DJDJ
     #imdb.rpn_roidb()
     
+    args.max_iters = 1000
+    
     roidb = get_training_roidb(imdb, args.proposal)
 
     output_dir = get_output_dir(imdb, None)

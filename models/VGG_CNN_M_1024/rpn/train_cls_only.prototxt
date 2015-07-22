@@ -4,9 +4,9 @@ layer {
   type: 'Python'
   top: 'data'
   top: 'labels'
-  top: 'bbox_targets'
-  top: 'bbox_loss_weights'
-  top: 'batch_size'
+  #top: 'bbox_targets'
+  #top: 'bbox_loss_weights'
+  #top: 'batch_size'
   python_param {
     module: 'roi_data_layer.layer'
     layer: 'RoIDataLayer'
@@ -239,29 +239,29 @@ layer {
     }
   }
 }
-layer {
-  name: "bbox_pred"
-  type: "Convolution"
-  bottom: "conv_rpn_feature"
-  top: "bbox_pred"
-  param {
-    lr_mult: 1
-    decay_mult: 1
-  }
-  param {
-    lr_mult: 2
-    decay_mult: 0
-  }
-  convolution_param {
-    num_output: 36
-    kernel_size: 1
-    
-    weight_filler {
-      type: "gaussian"
-      std: 0.01        # distribution with stdev 0.01 (default mean: 0)
-    }
-  }
-}
+#layer {
+#  name: "bbox_pred"
+#  type: "Convolution"
+#  bottom: "conv_rpn_feature"
+#  top: "bbox_pred"
+#  param {
+#    lr_mult: 1
+#    decay_mult: 1
+#  }
+#  param {
+#    lr_mult: 2
+#    decay_mult: 0
+#  }
+#  convolution_param {
+#    num_output: 36
+#    kernel_size: 1
+#    
+#    weight_filler {
+#      type: "gaussian"
+#      std: 0.01        # distribution with stdev 0.01 (default mean: 0)
+#    }
+#  }
+#}
 
 layer {
   name: "conv_rpn_score_reshape"
@@ -294,14 +294,14 @@ layer {
   }  
 }
 
-layer {
-  name: "loss_bbox"
-  type: "SmoothL1Loss"
-  bottom: "bbox_pred"
-  bottom: "bbox_targets"
-  bottom: "bbox_loss_weights"
-  bottom: "batch_size"
-  bottom: "labels"
-  top: "loss_bbox"
-  loss_weight: 10
-}
+#layer {
+#  name: "loss_bbox"
+#  type: "SmoothL1Loss"
+#  bottom: "bbox_pred"
+#  bottom: "bbox_targets"
+#  bottom: "bbox_loss_weights"
+#  bottom: "batch_size"
+#  bottom: "labels"
+#  top: "loss_bbox"
+#  loss_weight: 10
+#}

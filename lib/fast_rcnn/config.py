@@ -78,6 +78,12 @@ __C.TRAIN.SNAPSHOT_INFIX = ''
 # So far I haven't found this useful; likely more engineering work is required
 __C.TRAIN.USE_PREFETCH = False
 
+# Whether to normalize bbox target or not
+__C.TRAIN.NORMALIZE_BBOX = True
+
+# Whether to use logistic bbox target or plain bbox target 
+__C.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET = True
+
 #
 # Testing options
 #
