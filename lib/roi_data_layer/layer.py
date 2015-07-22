@@ -101,7 +101,7 @@ class RoIDataLayer(caffe.Layer):
                 
                 top[4].reshape(1)
                 batch_size_data = np.zeros((1, 1))
-                batch_size_data[0, 0] = cfg.TRAIN.BATCH_SIZE
+                batch_size_data[0, 0] = cfg.TRAIN.BATCH_SIZE * cfg.TRAIN.FG_FRACTION
                 top[4].data[...] = batch_size_data
         else:
             self._RPN = False            

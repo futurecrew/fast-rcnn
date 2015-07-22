@@ -1,4 +1,4 @@
-EXP_DIR: faster_rcnn
+EXP_DIR: faster_rcnn_cls_only
 TRAIN:
   FG_THRESH: 0.7
   BG_THRESH_HI: 0.3
@@ -6,3 +6,4 @@ TRAIN:
   FG_FRACTION: 0.5
   BATCH_SIZE: 512
   SNAPSHOT_ITERS: 1000
+  BBOX_REG: False

@@ -30,7 +30,6 @@ class SolverWrapper(object):
         self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
-        # DJDJ
         self.bbox_means, self.bbox_stds = \
                 rdl_roidb.add_bbox_regression_targets(roidb, proposal)
         print 'done'

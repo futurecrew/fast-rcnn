@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import caffe
 from labels import read_label_file
 from fast_rcnn.test import _get_image_blob
+from utils.model import last_conv_size
+from fast_rcnn.config import cfg
 
 class Detector(object):
     
@@ -77,6 +79,39 @@ class Detector(object):
                             
         return no_to_find, no_found, len(rects)
 
+    def get_img_rect(self, img_height, img_width, conv_height, conv_width, axis1, axis2, axis3):
+
+        anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
+                   [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
+                   [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
+                
+        img_center_x = img_width * axis3 / conv_width
+        img_center_y = img_height * axis2 / conv_height
+        anchor_size = anchors[axis1]
+        img_x1 = img_center_x - anchor_size[0] / 2 
+        img_x2 = img_center_x + anchor_size[0] / 2 
+        img_y1 = img_center_y - anchor_size[1] / 2 
+        img_y2 = img_center_y + anchor_size[1] / 2 
+        
+        return (img_x1, img_y1, img_x2, img_y2)
+
+    def display(self, im_blob, proposal_rects):
+        import matplotlib.pyplot as plt
+        
+        im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
+        im += cfg.PIXEL_MEANS
+        im = im[:, :, (2, 1, 0)]
+        im = im.astype(np.uint8)
+        plt.imshow(im)
+        for proposal_rect in proposal_rects:
+            plt.gca().add_patch(
+                plt.Rectangle((proposal_rect[0], proposal_rect[1]), proposal_rect[2] - proposal_rect[0],
+                              proposal_rect[3] - proposal_rect[1], fill=False,
+                              edgecolor='r', linewidth=3)
+                )
+        plt.show()
+
+
     def gogo(self, voc_base_folder, prototxt, caffemodel):
         match_threshold = 0.5
         min_size = 1
@@ -95,7 +130,7 @@ class Detector(object):
 
             no += 1
             
-            if file_name != '000005.jpg':
+            if file_name != '000012.jpg':
                 continue
             
             im = cv2.imread(image_folder + '/' + file_name)
@@ -107,6 +142,33 @@ class Detector(object):
             blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False))
 
             cls_pred = blobs_out['cls_pred']
+            
+            pos_pred = cls_pred[:, :, 1, :, :]
+            sorted_pred = np.argsort(pos_pred, axis=None)[::-1]
+            height = pos_pred.shape[2]
+            width = pos_pred.shape[3]
+            proposal_rects = []
+            
+            for i in range(100):
+                top_index = sorted_pred[i]
+                axis1 = top_index / height / width
+                axis2 = top_index / width % height
+                axis3 = top_index % width
+                
+                img_height = blobs['data'].shape[2]
+                img_width = blobs['data'].shape[3]
+                conv_height, scale_height = last_conv_size(img_height)
+                conv_width, scale_width = last_conv_size(img_width)
+                
+                proposal_rect = self.get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, axis3)
+                proposal_rects.append(proposal_rect)
+                
+                print pos_pred[0, axis1, axis2, axis3]
+                print 'axis : (0, %s, %s, %s)' % (axis1, axis2, axis3)
+                print 'proposal_rect : %s' % (proposal_rect, )
+                
+            self.display(blobs['data'], proposal_rects)
+            
             box_deltas = blobs_out['bbox_pred']
             pred_boxes = _bbox_pred(boxes, box_deltas)
             pred_boxes = _clip_boxes(pred_boxes, im.shape)            
@@ -130,9 +192,10 @@ class Detector(object):
 if __name__ == '__main__':
     voc_base_folder = 'E:/data/VOCdevkit/VOC2007/'
     prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
-    #prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/test.prototxt'
+
+    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
+    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_1000.caffemodel'
-    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_80000.caffemodel'
     
     detector = Detector()
     detector.gogo(voc_base_folder, prototxt, caffemodel)
