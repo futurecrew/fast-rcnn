@@ -18,7 +18,9 @@ import argparse
 import pprint
 import numpy as np
 import sys
+import io
 from util import prevent_sleep
+from logger import stdout_redirector, redirect_stdout, stdout_redirected
 import os
 
 def parse_args():
@@ -62,13 +64,14 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
+
     args = parse_args()
+    
+    if args.cfg_file is not None:
+        cfg_from_file(args.cfg_file)
 
     print('Called with args:')
     print(args)
-
-    if args.cfg_file is not None:
-        cfg_from_file(args.cfg_file)
 
     print('Using config:')
     pprint.pprint(cfg)
@@ -80,9 +83,6 @@ if __name__ == '__main__':
 
     prevent_sleep()
     
-    #os.environ['GLOG_log_dir'] = 'experiments/logs/' + cfg.EXP_DIR
-    #print os.environ['GLOG_log_dir']
-
     # set up caffe
     if args.cpu == 0:
         caffe.set_mode_cpu()
@@ -98,8 +98,6 @@ if __name__ == '__main__':
     
     # DJDJ
     #imdb.rpn_roidb()
-    
-    args.max_iters = 1000
     
     roidb = get_training_roidb(imdb, args.proposal)
 

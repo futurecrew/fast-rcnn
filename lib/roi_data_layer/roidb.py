@@ -339,6 +339,7 @@ def _compute_targets_rpn(rois, labels, gt_indexes, gt_boxes):
     gt_ctr_x = gt_rois[:, 0] + 0.5 * gt_widths
     gt_ctr_y = gt_rois[:, 1] + 0.5 * gt_heights
 
+    """
     print 'rois[6510] : %s' % rois[6510]
     print 'gt_boxes[0] : %s' % gt_boxes[0]
     
@@ -352,7 +353,7 @@ def _compute_targets_rpn(rois, labels, gt_indexes, gt_boxes):
     
     print 'gt ctr_x - ex ctr_x : %s' % (gt_ctr_x_temp - roi_ctr_x_temp)
     print 'gt width / ex width : %s' % (gt_width_temp / roi_width_temp)
-
+    """
 
     if cfg.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET:
         targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths

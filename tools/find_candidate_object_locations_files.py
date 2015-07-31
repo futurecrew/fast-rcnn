@@ -2,6 +2,7 @@ import _init_paths
 import os
 import cv2
 import cPickle
+import time
 from skimage import io
 import numpy as np
 from caffe.proto import caffe_pb2
@@ -13,6 +14,7 @@ from fast_rcnn.test import _get_image_blob
 from utils.model import last_conv_size
 from fast_rcnn.config import cfg, cfg_from_file, get_output_dir
 from fast_rcnn.test import _bbox_pred, _clip_boxes
+from utils.cython_nms import nms
 
 class Detector(object):
     
@@ -38,7 +40,7 @@ class Detector(object):
         
         return img_rect
 
-    def check_match(self, im_blob, ground_rects, pred_rects, match_threshold):
+    def check_match(self, file_name, im_blob, ground_rects, pred_rects, match_threshold, scores, proposal_rects):
         found_rects = []
         
         no_to_find = len(ground_rects)
@@ -70,8 +72,9 @@ class Detector(object):
 
         #if no_to_find != no_found:
         if True:
-            print '%s out of %s found using %s candidates' %(no_found, no_to_find, len(pred_rects))
-
+            print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
+            
+            """
             im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
             im += cfg.PIXEL_MEANS
             im = im[:, :, (2, 1, 0)]
@@ -91,21 +94,45 @@ class Detector(object):
                                   edgecolor='r', linewidth=3)
                     )
                 
+            plt.show(block=False)
+            raw_input("")
+            plt.close()
             """
-            for pred_box in pred_boxes:
+            
+            """
+            for pred_rect, score, proposal_rect in zip(pred_rects, scores, proposal_rects):
+                
+                #if pred_rect[2] - pred_rect[0] > 60:
+                #    continue
+                
+                plt.imshow(im)
+                for ground_rect in ground_rects: 
+                    plt.gca().add_patch(
+                        plt.Rectangle((ground_rect[0], ground_rect[1]), ground_rect[2] - ground_rect[0],
+                                      ground_rect[3] - ground_rect[1], fill=False,
+                                      edgecolor='b', linewidth=3)
+                        )
                 plt.gca().add_patch(
-                    plt.Rectangle((pred_box[0], pred_box[1]), pred_box[2] - pred_box[0],
-                                  pred_box[3] - pred_box[1], fill=False,
+                    plt.Rectangle((proposal_rect[0], proposal_rect[1]), proposal_rect[2] - proposal_rect[0],
+                                  proposal_rect[3] - proposal_rect[1], fill=False,
                                   edgecolor='g', linewidth=3)
                     )
-            """
+                plt.gca().add_patch(
+                    plt.Rectangle((pred_rect[0], pred_rect[1]), pred_rect[2] - pred_rect[0],
+                                  pred_rect[3] - pred_rect[1], fill=False,
+                                  edgecolor='r', linewidth=3)
+                    )
+                plt.text(pred_rect[0] + 10, pred_rect[1] + 25, score)
                 
-            plt.show()
-
+                plt.show(block=False)
+                raw_input("")
+                plt.close()
+            """
+            
         return no_to_find, no_found
     
-    def gogo(self, voc_base_folder, prototxt, caffemodel, gt, data_list):
-        TOP_N = 300
+    def gogo(self, TOP_N, MAX_CANDIDATES, voc_base_folder, prototxt, caffemodel, gt, data_list):
+        NMS_THRESH = 0.8
         match_threshold = 0.5
         
         image_folder = voc_base_folder + '/JPEGImages'
@@ -129,10 +156,9 @@ class Detector(object):
 
             no += 1
             
-            
-            #if file_name != '000009' and file_name != '000017':
+            # DJDJ
+            #if file_name != '000032':
             #    continue
-            
             
             im = cv2.imread(image_folder + '/' + file_name + '.jpg')
             
@@ -140,18 +166,24 @@ class Detector(object):
             blobs['data'], im_scale_factors = _get_image_blob(im)
             
             net.blobs['data'].reshape(*(blobs['data'].shape))
+            
+            time1 = time.time()
             blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False))
+            
+            #print 'time 1 : %.3fs' % (time.time() - time1)
 
             cls_pred = blobs_out['cls_pred']
             box_deltas = blobs_out['bbox_pred']
             
             pos_pred = cls_pred[:, :, 1, :, :]
             sorted_pred = np.argsort(pos_pred, axis=None)[::-1]
+            sorted_scores = np.sort(pos_pred, axis=None)[::-1]
             height = pos_pred.shape[2]
             width = pos_pred.shape[3]
             proposal_rects = []
 
             top_index = sorted_pred[:TOP_N]
+            sorted_scores = sorted_scores[:TOP_N]
             axis1 = top_index / height / width
             axis2 = top_index / width % height
             axis3 = top_index % width
@@ -190,15 +222,23 @@ class Detector(object):
             pred_boxes = _bbox_pred(proposal_rects, box_deltas_rects)
             pred_boxes = _clip_boxes(pred_boxes, (img_height, img_width))            
             
+            box_info = np.hstack((pred_boxes,
+                                  sorted_scores[:, np.newaxis])).astype(np.float32)            
+
+            keep = nms(box_info, NMS_THRESH)
+            
+            pred_boxes = pred_boxes[keep, :]
+            pred_boxes = pred_boxes[:MAX_CANDIDATES]
+        
             gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
             
             #for pred_box in pred_boxes:
             #    print 'pred_box : %s' % (pred_box, )
                 
-            for gt_box in gt_boxes:
-                print 'gt_box : %s' % (gt_box, )
+            #for gt_box in gt_boxes:
+            #    print 'gt_box : %s' % (gt_box, )
                 
-            no_to_find, no_found = self.check_match(blobs['data'], gt_boxes, pred_boxes, match_threshold)
+            no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, pred_boxes, match_threshold, sorted_scores, proposal_rects)
             
             no_candidates = len(pred_boxes)
             
@@ -207,10 +247,7 @@ class Detector(object):
              
             #print '[%s] %s out of %s found using %s candidates' %(no, no_found, no_to_find, no_candidates)
             
-            #if no == 100:
-            #    break
-                
-        print 'accuracy : %.3f' % (float(total_no_found) / float(total_no_to_find))  
+            print '[%s] accuracy : %.3f' % (no, float(total_no_found) / float(total_no_to_find))  
                 
 
 if __name__ == '__main__':
@@ -220,12 +257,18 @@ if __name__ == '__main__':
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
 
-    caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_1000.caffemodel'
+    iters = 300
+    TOP_N = 30000
+    MAX_CANDIDATES = 2000
+    
+    caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % iters
     data_list = voc_base_folder + '/ImageSets/Main/trainval.txt'
     gt = 'E:/project/fast-rcnn/data/cache/voc_2007_trainval_gt_roidb.pkl'
     
     cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
     cfg_from_file(cfg_file)
 
+    caffe.set_mode_gpu()
+    
     detector = Detector()
-    detector.gogo(voc_base_folder, prototxt, caffemodel, gt, data_list)
+    detector.gogo(TOP_N, MAX_CANDIDATES, voc_base_folder, prototxt, caffemodel, gt, data_list)

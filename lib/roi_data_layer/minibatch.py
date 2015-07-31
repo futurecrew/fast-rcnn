@@ -45,13 +45,6 @@ def get_minibatch(roidb, num_classes):
                 = _sample_rois_rpn(roidb[im_i], fg_rois_per_image, rois_per_image,
                                num_classes, conv_h, conv_w)
     
-            """
-            # DJDJ
-            labels = np.ones((1, 9, conv_h, conv_w), dtype=np.float32)
-            bbox_targets = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
-            bbox_loss = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
-            """
-
             # Add to RoIs blob
             if im_rois != None:
                 batch_ind = im_i * np.ones((im_rois.shape[0], 1))
@@ -172,6 +165,7 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     # Guard against the case when an image has fewer than fg_rois_per_image
     # foreground RoIs
     fg_rois_per_this_image = np.minimum(fg_rois_per_image, fg_inds.size)
+    
     # Sample foreground regions without replacement
     if fg_inds.size > 0:
         fg_inds = npr.choice(fg_inds, size=fg_rois_per_this_image,
@@ -183,6 +177,7 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
 
     # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
     bg_inds = np.where(labels == 0)[0]
+
     # Compute number of background RoIs to take from this image (guarding
     # against there being fewer than desired)
     bg_rois_per_this_image = rois_per_image - fg_rois_per_this_image
@@ -192,11 +187,12 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     if bg_inds.size > 0:
         bg_inds = npr.choice(bg_inds, size=bg_rois_per_this_image,
                              replace=False)
+    
 
-    # DJDJ
+
+    
     new_labels[fg_inds] = 1
     new_labels[bg_inds] = 0
-    #new_labels = labels
 
     if 'rois' in roidb:
         rois = roidb['rois'][fg_inds]
@@ -223,13 +219,6 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     print 'label no 1 : %s' % len(np.where(new_labels == 1)[0])
     print 'new_bbox_target no 1 : %s' % len(np.where(new_bbox_target != 0)[0])
     print 'bbox_loss_weights no 1 : %s' % len(np.where(bbox_loss_weights > 0)[0])
-    """
-
-    """
-    # DJDJ
-    labels = np.ones((1, 9, conv_h, conv_w), dtype=np.float32)
-    bbox_targets = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
-    bbox_loss = np.ones((1, 36, conv_h, conv_w), dtype=np.float32)
     """
 
     new_labels = new_labels.reshape((1, 9, conv_height, conv_width))
@@ -387,11 +376,7 @@ def _get_bbox_regression_labels_rpn(bbox_target_data, num_classes, labels):
     #print 'len(inds) : %s' % len(inds)
 
     for ind in inds:
-        # DJDJ
         bbox_targets[ind, :] = bbox_target_data[ind, 1:]
-        #label = bbox_target_data[ind, 0] / 20.
-        #bbox_targets[ind, :] = [1. * label, 1. * label, 1. * label, 1. * label]
-        
         bbox_loss_weights[ind, :] = [1., 1., 1., 1.]
         
         #print 'bbox_targets[ind, :] : %s - %s ' % (bbox_target_data[ind, 0], bbox_targets[ind, :])
