@@ -74,7 +74,7 @@ class Detector(object):
         if True:
             print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
             
-            """
+            
             im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
             im += cfg.PIXEL_MEANS
             im = im[:, :, (2, 1, 0)]
@@ -97,7 +97,7 @@ class Detector(object):
             plt.show(block=False)
             raw_input("")
             plt.close()
-            """
+            
             
             """
             for pred_rect, score, proposal_rect in zip(pred_rects, scores, proposal_rects):
@@ -132,7 +132,7 @@ class Detector(object):
         return no_to_find, no_found
     
     def gogo(self, TOP_N, MAX_CANDIDATES, voc_base_folder, prototxt, caffemodel, gt, data_list):
-        NMS_THRESH = 0.8
+        NMS_THRESH = 0.7
         match_threshold = 0.5
         
         image_folder = voc_base_folder + '/JPEGImages'
@@ -157,7 +157,7 @@ class Detector(object):
             no += 1
             
             # DJDJ
-            #if file_name != '000032':
+            #if file_name != '000026':
             #    continue
             
             im = cv2.imread(image_folder + '/' + file_name + '.jpg')
@@ -190,27 +190,24 @@ class Detector(object):
             
             img_height = blobs['data'].shape[2]
             img_width = blobs['data'].shape[3]
-            conv_height, scale_height = last_conv_size(img_height)
-            conv_width, scale_width = last_conv_size(img_width)
 
 
-
-            """
             # DJDJ
-            top_index = np.array([6510])
-            axis1 = np.array([3])
-            axis2 = np.array([10])
-            axis3 = np.array([20])
-            pred = box_deltas[0, axis1[0]*4:axis1[0]*4+4, axis2[0], axis3[0]]
+            """
+            axis1 = np.array([2, 2, 2, 2])
+            axis2 = np.array([22, 22, 22, 22])
+            axis3 = np.array([26, 28, 30, 32])
+            top_index = axis1 * pos_pred.shape[2] * pos_pred.shape[3] + axis2 * pos_pred.shape[3] + axis3
+            sorted_scores = sorted_scores[top_index]
             """
             
             
-            proposal_rects = self.get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, axis3)
+        
+            proposal_rects = self.get_img_rect(img_height, img_width, pos_pred.shape[2], pos_pred.shape[3], axis1, axis2, axis3)
             
             """
             print ''
             print 'proposal_rects[0] : %s' % proposal_rects[0]            
-            print 'pred[%s] : %s' % (0, pred)
             """
 
             box_deltas_rects = np.zeros((len(axis1), 4), np.float32)
@@ -257,7 +254,8 @@ if __name__ == '__main__':
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
 
-    iters = 300
+    iters = 1000
+    
     TOP_N = 30000
     MAX_CANDIDATES = 2000
     

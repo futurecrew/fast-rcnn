@@ -86,6 +86,15 @@ def prepare_roidb_rpn(imdb):
         gt_rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
         boxes = np.zeros((9, 4), dtype=np.int32)
         
+        gt_no = len(gt_boxes)
+        max_of_maxes = np.zeros((gt_no))
+        max_anchors = np.zeros((gt_no))
+        max_ys = np.zeros((gt_no))
+        max_xs = np.zeros((gt_no))
+        max_labels = np.zeros((gt_no))
+        max_classes = np.zeros((gt_no))
+        max_boxes = np.zeros((gt_no, 4))
+
         
         if i % 100 == 0:
             print 'processing image %s' % i
@@ -124,34 +133,38 @@ def prepare_roidb_rpn(imdb):
                     base_index = I * conv_height * conv_width + center_y * conv_width + center_x
                     labels[base_index] = gt_classes[argmaxes[I]]
                     gt_indexes[base_index] = argmaxes[I]
-
-                    # set box rectangles when a box of overlapping area if bigger than FG_THRESH
                     rois[base_index] = boxes[I]
 
                 # For negative train data
-                I = np.where((maxes > cfg.TRAIN.BG_THRESH_LO) & 
-                             (maxes < cfg.TRAIN.BG_THRESH_HI))[0]
+                I = np.where(maxes < cfg.TRAIN.BG_THRESH_HI)[0]
                 
                 if len(I) > 0:
-                    # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
+                    # set label to 0 when a box of overlapping area if bigger than FG_THRESH 
                     base_index = I * conv_height * conv_width + center_y * conv_width + center_x
                     labels[base_index] = 0
                     gt_indexes[base_index] = -1
 
 
-                # set label to 1 when a box has the biggest area among the 9 boxes 
-                I = np.where(maxes > 0)[0]
-                if len(I) > 0:
-                    max_of_maxes = np.argmax(maxes)
+                # Check max overlapping anchor
+                argmaxes = gt_overlaps.argmax(axis=0)
+                maxes = gt_overlaps.max(axis=0)
                 
-                    base_index = max_of_maxes * conv_height * conv_width + center_y * conv_width + center_x
-                    labels[base_index] = gt_classes[argmaxes[max_of_maxes]]
-                    gt_indexes[base_index] = argmaxes[max_of_maxes]
-                    
-                    # set box rectangles when a box has the biggest area among the 9 boxes
-                    rois[base_index] = boxes[max_of_maxes]
-                    
-                    
+                for m in range(len(gt_boxes)):
+                    if maxes[m] > max_of_maxes[m]:
+                        max_of_maxes[m] = maxes[m]
+                        max_ys[m] = center_y
+                        max_xs[m] = center_x
+                        max_classes[m] = gt_classes[m]
+                        max_anchors[m] = argmaxes[m]
+                        max_boxes[m] = boxes[max_anchors[m]].copy()
+
+                
+        # set label to 1 of the anchor which has the biggest overlapping area among all the anchors 
+        for m in range(len(gt_boxes)):
+            base_index = max_anchors[m] * conv_height * conv_width + max_ys[m] * conv_width + max_xs[m]
+            labels[base_index] = max_classes[m]
+            gt_indexes[base_index] = m
+            rois[base_index] = max_boxes[m]
         
         bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
         

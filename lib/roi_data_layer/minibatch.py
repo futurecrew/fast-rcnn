@@ -57,7 +57,7 @@ def get_minibatch(roidb, num_classes):
             bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
             
         # For debug visualizations
-        #_vis_minibatch_rpn(im_blob, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob)
+        #_vis_minibatch_rpn(im_blob, conv_h, conv_w, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob)
     
         blobs = {'data': im_blob,
                  'labels': labels_blob}            
@@ -145,6 +145,22 @@ def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
 
     return labels, overlaps, rois, bbox_targets, bbox_loss_weights
 
+def get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, axis3):
+
+    anchors = np.array([[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
+                       [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
+                       [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]])
+            
+    img_center_x = img_width * axis3 / conv_width
+    img_center_y = img_height * axis2 / conv_height
+    anchor_size = anchors[axis1]
+    img_x1 = img_center_x - anchor_size[0] / 2 
+    img_x2 = img_center_x + anchor_size[0] / 2 
+    img_y1 = img_center_y - anchor_size[1] / 2 
+    img_y2 = img_center_y + anchor_size[1] / 2 
+    
+    return [img_x1, img_y1, img_x2, img_y2]
+
 def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes, 
                  union_conv_height, union_conv_width):
     """Generate a random sample of RoIs comprising foreground and background
@@ -203,11 +219,43 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
     print 'labels.shape %s' % labels.shape
     print 'bbox_target.shape %s' % (bbox_target.shape, )
     
-    for i in fg_inds:
-        print 'label : %s ' % labels[i]
-        print 'bbox_target : %s ' % bbox_target[i]
-    """
+    for fg_ind in fg_inds:
+        print 'label : %s ' % labels[fg_ind]
+        print 'bbox_target : %s ' % bbox_target[fg_ind]
+    
+        axis1 = fg_ind / conv_height / conv_width
+        axis2 = fg_ind / conv_width % conv_height
+        axis3 = fg_ind % conv_width
         
+        img_height = blobs['data'].shape[2]
+        img_width = blobs['data'].shape[3]
+        proposal_rects = get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, axis3)
+        
+        for proposal_rect in proposal_rects:
+            
+            plt.imshow(im)
+            for ground_rect in ground_rects: 
+                plt.gca().add_patch(
+                    plt.Rectangle((ground_rect[0], ground_rect[1]), ground_rect[2] - ground_rect[0],
+                                  ground_rect[3] - ground_rect[1], fill=False,
+                                  edgecolor='b', linewidth=3)
+                    )
+            plt.gca().add_patch(
+                plt.Rectangle((proposal_rect[0], proposal_rect[1]), proposal_rect[2] - proposal_rect[0],
+                              proposal_rect[3] - proposal_rect[1], fill=False,
+                              edgecolor='g', linewidth=3)
+                )
+            plt.gca().add_patch(
+                plt.Rectangle((pred_rect[0], pred_rect[1]), pred_rect[2] - pred_rect[0],
+                              pred_rect[3] - pred_rect[1], fill=False,
+                              edgecolor='r', linewidth=3)
+                )
+            
+            plt.show(block=False)
+            raw_input("")
+            plt.close()
+    """
+    
     new_bbox_target[fg_inds] = bbox_target[fg_inds]
 
     new_bbox_target, bbox_loss_weights = \
@@ -404,33 +452,45 @@ def _vis_minibatch(im_blob, rois_blob, labels_blob, overlaps):
             )
         plt.show()
 
-def _vis_minibatch_rpn(im_blob, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob):
+def _vis_minibatch_rpn(im_blob, conv_h, conv_w, rois_blob, labels_blob, roidb, bbox_targets_blob, bbox_loss_blob):
     """Visualize a mini-batch for debugging."""
     import matplotlib.pyplot as plt
-    for i in xrange(rois_blob.shape[0]):
-        rois = rois_blob[i, :]
-        im_ind = rois[0]
-        roi = rois[1:]
-        resized_gt_boxes = roidb[int(im_ind)]['resized_gt_boxes']
-        im = im_blob[im_ind, :, :, :].transpose((1, 2, 0)).copy()
+    for i in xrange(len(roidb)):
+        resized_gt_boxes = roidb[int(i)]['resized_gt_boxes']
+        im = im_blob[i, :, :, :].transpose((1, 2, 0)).copy()
         im += cfg.PIXEL_MEANS
         im = im[:, :, (2, 1, 0)]
         im = im.astype(np.uint8)
-        #cls = labels_blob[i]
-        plt.imshow(im)
         
-        for resized_gt_box in resized_gt_boxes:
-            resized_gt_box = resized_gt_box.astype(np.int)
-            plt.gca().add_patch(
-                plt.Rectangle((resized_gt_box[0], resized_gt_box[1]), resized_gt_box[2] - resized_gt_box[0],
-                              resized_gt_box[3] - resized_gt_box[1], fill=False,
-                              edgecolor='g', linewidth=3)
-                )
+        for j in range(9):
+            for k in range(labels_blob.shape[2]):
+                for l in range(labels_blob.shape[3]):
+                    label = labels_blob[i][j][k][l]
+                    
+                    if label == -1:
+                        continue
+                    elif label == 1:
+                        color = 'g'
+                    elif label == 0:
+                        #color = 'y'
+                        continue
+
+                    plt.imshow(im)
         
-        print 'roid : %s' % roi
-        plt.gca().add_patch(
-            plt.Rectangle((roi[0], roi[1]), roi[2] - roi[0],
-                          roi[3] - roi[1], fill=False,
-                          edgecolor='r', linewidth=3)
-            )
-        plt.show()
+                    for resized_gt_box in resized_gt_boxes:
+                        resized_gt_box = resized_gt_box.astype(np.int)
+                        plt.gca().add_patch(
+                            plt.Rectangle((resized_gt_box[0], resized_gt_box[1]), resized_gt_box[2] - resized_gt_box[0],
+                                          resized_gt_box[3] - resized_gt_box[1], fill=False,
+                                          edgecolor='b', linewidth=3)
+                            )
+                    
+                    proposal_rects = get_img_rect(im.shape[0], im.shape[1], conv_h, conv_w, j, k, l)
+                    plt.gca().add_patch(
+                        plt.Rectangle((proposal_rects[0], proposal_rects[1]), proposal_rects[2] - proposal_rects[0],
+                                      proposal_rects[3] - proposal_rects[1], fill=False,
+                                      edgecolor=color, linewidth=3)
+                    )
+                    plt.show(block=False)
+                    raw_input("")
+                    plt.close()
