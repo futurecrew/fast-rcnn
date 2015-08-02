@@ -15,6 +15,10 @@ from utils.model import last_conv_size
 from fast_rcnn.config import cfg, cfg_from_file, get_output_dir
 from fast_rcnn.test import _bbox_pred, _clip_boxes
 from utils.cython_nms import nms
+from caffe import nms_cpp
+#from utils.nms import nms
+#from utils.nms2 import nms
+#from utils.nms3 import nms
 
 class Detector(object):
     
@@ -70,15 +74,15 @@ class Detector(object):
                 
                 found_rects.append(max_overlap_rect)
 
-        #if no_to_find != no_found:
-        if True:
-            print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
-            
-            
+        print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
+
+        if False:
             im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
             im += cfg.PIXEL_MEANS
             im = im[:, :, (2, 1, 0)]
             im = im.astype(np.uint8)
+            
+            
             plt.imshow(im)
             for ground_rect in ground_rects: 
                 plt.gca().add_patch(
@@ -99,12 +103,9 @@ class Detector(object):
             plt.close()
             
             
+            
             """
             for pred_rect, score, proposal_rect in zip(pred_rects, scores, proposal_rects):
-                
-                #if pred_rect[2] - pred_rect[0] > 60:
-                #    continue
-                
                 plt.imshow(im)
                 for ground_rect in ground_rects: 
                     plt.gca().add_patch(
@@ -157,7 +158,7 @@ class Detector(object):
             no += 1
             
             # DJDJ
-            #if file_name != '000026':
+            #if file_name != '000009':
             #    continue
             
             im = cv2.imread(image_folder + '/' + file_name + '.jpg')
@@ -167,10 +168,10 @@ class Detector(object):
             
             net.blobs['data'].reshape(*(blobs['data'].shape))
             
-            time1 = time.time()
+            #print 'time1 : %.3f' % time.time()
             blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False))
             
-            #print 'time 1 : %.3fs' % (time.time() - time1)
+            #print 'time2 : %.3f' % time.time()
 
             cls_pred = blobs_out['cls_pred']
             box_deltas = blobs_out['bbox_pred']
@@ -202,8 +203,11 @@ class Detector(object):
             """
             
             
+            #print 'time3 : %.3f' % time.time()
         
             proposal_rects = self.get_img_rect(img_height, img_width, pos_pred.shape[2], pos_pred.shape[3], axis1, axis2, axis3)
+            
+            #print 'time4 : %.3f' % time.time()
             
             """
             print ''
@@ -222,7 +226,20 @@ class Detector(object):
             box_info = np.hstack((pred_boxes,
                                   sorted_scores[:, np.newaxis])).astype(np.float32)            
 
-            keep = nms(box_info, NMS_THRESH)
+            time1 = time.time()
+            keep1 = nms(box_info, NMS_THRESH, MAX_CANDIDATES)
+            print 'keep1 : %s' % len(keep1)
+            print 'nms %s took %.3f sec' % (len(box_info), time.time() - time1)            
+
+            x1s = np.ascontiguousarray(box_info[:, 0])
+            y1s = np.ascontiguousarray(box_info[:, 1])
+            x2s = np.ascontiguousarray(box_info[:, 2])
+            y2s = np.ascontiguousarray(box_info[:, 3])
+            scores = np.ascontiguousarray(box_info[:, 4])
+            time1 = time.time()
+            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH)
+            print 'keep : %s' % len(keep)
+            print 'nms %s took %.3f sec' % (len(box_info), time.time() - time1)
             
             pred_boxes = pred_boxes[keep, :]
             pred_boxes = pred_boxes[:MAX_CANDIDATES]
@@ -236,14 +253,14 @@ class Detector(object):
             #    print 'gt_box : %s' % (gt_box, )
                 
             no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, pred_boxes, match_threshold, sorted_scores, proposal_rects)
+
+            #print 'time7 : %.3f' % time.time()
             
             no_candidates = len(pred_boxes)
             
             total_no_to_find += no_to_find
             total_no_found += no_found
              
-            #print '[%s] %s out of %s found using %s candidates' %(no, no_found, no_to_find, no_candidates)
-            
             print '[%s] accuracy : %.3f' % (no, float(total_no_found) / float(total_no_to_find))  
                 
 
@@ -254,14 +271,18 @@ if __name__ == '__main__':
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
 
-    iters = 1000
+    iters = 80000
     
     TOP_N = 30000
-    MAX_CANDIDATES = 2000
+    MAX_CANDIDATES = 2300
     
     caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % iters
-    data_list = voc_base_folder + '/ImageSets/Main/trainval.txt'
-    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_trainval_gt_roidb.pkl'
+
+    #data_list = voc_base_folder + '/ImageSets/Main/trainval.txt'
+    #gt = 'E:/project/fast-rcnn/data/cache/voc_2007_trainval_gt_roidb.pkl'
+    
+    data_list = voc_base_folder + '/ImageSets/Main/test.txt'
+    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_test_gt_roidb.pkl'
     
     cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
     cfg_from_file(cfg_file)
