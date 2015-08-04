@@ -5,6 +5,7 @@
 # Written by Ross Girshick
 # --------------------------------------------------------
 
+import time
 import numpy as np
 cimport numpy as np
 
@@ -14,7 +15,7 @@ cdef inline np.float32_t max(np.float32_t a, np.float32_t b):
 cdef inline np.float32_t min(np.float32_t a, np.float32_t b):
     return a if a <= b else b
 
-def nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
+def nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh, np.intp_t max_items = -1):
     cdef np.ndarray[np.float32_t, ndim=1] x1 = dets[:, 0]
     cdef np.ndarray[np.float32_t, ndim=1] y1 = dets[:, 1]
     cdef np.ndarray[np.float32_t, ndim=1] x2 = dets[:, 2]
@@ -43,11 +44,18 @@ def nms(np.ndarray[np.float32_t, ndim=2] dets, np.float thresh):
     cdef np.float32_t inter, ovr
 
     keep = []
+    keep_no = 0
+    
     for _i in range(ndets):
         i = order[_i]
         if suppressed[i] == 1:
             continue
         keep.append(i)
+        keep_no += 1
+        
+        if max_items != -1 and keep_no == max_items:
+            return keep
+        
         ix1 = x1[i]
         iy1 = y1[i]
         ix2 = x2[i]

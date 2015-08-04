@@ -23,7 +23,7 @@ from utils.model import last_conv_size
 
 
 class pascal_voc(datasets.imdb):
-    def __init__(self, image_set, year, proposal='ss', devkit_path=None):
+    def __init__(self, image_set, year, train_target='frcnn', devkit_path=None):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
@@ -41,7 +41,7 @@ class pascal_voc(datasets.imdb):
         self._image_index = self._load_image_set_index()
         
         # Default to roidb handler
-        if proposal == 'rpn':
+        if train_target == 'rpn':
             self._roidb_handler = self.rpn_roidb
         else:
             self._roidb_handler = self.selective_search_roidb
@@ -249,14 +249,14 @@ class pascal_voc(datasets.imdb):
         
         for index in range(self.num_images):
             im = cv2.imread(self.image_path_at(index))
-            resize_scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
+            resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)
             
             # Generate anchors based on the resized image
             im_width = int(im.shape[0] * resize_scale)
             im_height = int(im.shape[1] * resize_scale)
             
-            conv_width, scale_width = last_conv_size(im_width)
-            conv_height, scale_height = last_conv_size(im_height)
+            conv_width, scale_width = last_conv_size(im_width, cfg.MODEL_NAME)
+            conv_height, scale_height = last_conv_size(im_height, cfg.MODEL_NAME)
             
             one_list = []
             

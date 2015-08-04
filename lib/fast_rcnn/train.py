@@ -24,14 +24,14 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, roidb, output_dir,
-                 pretrained_model=None, proposal='ss'):
+                 pretrained_model=None, train_target='frcnn'):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
-        self.proposal = proposal
+        self.train_target = train_target
 
         print 'Computing bounding-box regression targets...'
         self.bbox_means, self.bbox_stds = \
-                rdl_roidb.add_bbox_regression_targets(roidb, proposal)
+                rdl_roidb.add_bbox_regression_targets(roidb, train_target)
         print 'done'
 
         self.solver = caffe.SGDSolver(solver_prototxt)
@@ -60,7 +60,7 @@ class SolverWrapper(object):
 
             if cfg.TRAIN.NORMALIZE_BBOX:
                 # scale and shift with bbox reg unnormalization; then save snapshot
-                if self.proposal == 'rpn':
+                if self.train_target == 'rpn':
                     extended_stds = self.bbox_stds[:, np.newaxis, np.newaxis, np.newaxis]
                 else:
                     extended_stds = self.bbox_stds[:, np.newaxis]
@@ -118,7 +118,7 @@ class SolverWrapper(object):
         if last_snapshot_iter != self.solver.iter:
             self.snapshot()
 
-def get_training_roidb(imdb, proposal):
+def get_training_roidb(imdb, train_target):
     """Returns a roidb (Region of Interest database) for use in training."""
     if cfg.TRAIN.USE_FLIPPED:
         print 'Appending horizontally-flipped training examples...'
@@ -126,7 +126,7 @@ def get_training_roidb(imdb, proposal):
         print 'done'
 
     print 'Preparing training data...'
-    if proposal == 'rpn':
+    if train_target == 'rpn':
         rdl_roidb.prepare_roidb_rpn(imdb)
     else:
         rdl_roidb.prepare_roidb(imdb)
@@ -136,11 +136,11 @@ def get_training_roidb(imdb, proposal):
 
 def train_net(solver_prototxt, roidb, output_dir,
               pretrained_model=None, max_iters=40000,
-              proposal='ss'):
+              train_target='frcnn'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
-                       proposal=proposal)
+                       train_target=train_target)
 
     print 'Solving...'
     sw.train_model(max_iters)

@@ -52,9 +52,9 @@ def parse_args():
     parser.add_argument('--rand', dest='randomize',
                         help='randomize (do not use a fixed seed)',
                         action='store_true')
-    parser.add_argument('--proposal', dest='proposal',
-                        help='proposal to use',
-                        default='ss', type=str)
+    parser.add_argument('--train_target', dest='train_target',
+                        help='train target',
+                        default='frcnn', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -91,15 +91,24 @@ if __name__ == '__main__':
         if args.gpu_id is not None:
             caffe.set_device(args.gpu_id)
     
-    proposal = args.proposal
+    train_target = args.train_target
 
-    imdb = get_imdb(args.imdb_name, proposal)
+    if 'VGG16' in args.pretrained_model:
+        model_name = 'VGG16'
+    elif 'VGG_CNN_M_1024' in args.pretrained_model:
+        model_name = 'VGG_CNN_M_1024'
+    else:
+        raise Exception("This model is not supported. %s" % args.pretrained_model)
+    
+    cfg.MODEL_NAME = model_name
+
+    imdb = get_imdb(args.imdb_name, train_target)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     
     # DJDJ
     #imdb.rpn_roidb()
     
-    roidb = get_training_roidb(imdb, args.proposal)
+    roidb = get_training_roidb(imdb, args.train_target)
 
     output_dir = get_output_dir(imdb, None)
     print 'Output will be saved to `{:s}`'.format(output_dir)
@@ -107,4 +116,4 @@ if __name__ == '__main__':
     train_net(args.solver, roidb, output_dir,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters,
-              proposal=proposal)
+              train_target=train_target)

@@ -12,6 +12,7 @@ from utils.cython_bbox import bbox_overlaps
 import numpy as np
 import scipy.sparse
 import datasets
+from fast_rcnn.config import cfg
 
 class imdb(object):
     """Image database."""
@@ -155,7 +156,8 @@ class imdb(object):
                 'Number of boxes must match number of ground-truth images. %s vs. %s' % (len(box_list), self.num_images)
         roidb = []
         for i in xrange(self.num_images):
-            boxes = box_list[i]
+            max_proposal_box = cfg.MAX_PROPOSAL_NO
+            boxes = box_list[i][:max_proposal_box]
             num_boxes = boxes.shape[0]
             overlaps = np.zeros((num_boxes, self.num_classes), dtype=np.float32)
 

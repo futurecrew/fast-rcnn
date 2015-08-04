@@ -135,6 +135,12 @@ __C.ROOT_DIR = osp.abspath(osp.join(osp.dirname(__file__), '..', '..'))
 # Place outputs under an experiments directory
 __C.EXP_DIR = 'default'
 
+# Maximum number of proposal boxes
+__C.MAX_PROPOSAL_NO = 10000
+
+# The name of a model
+__C.MODEL_NAME = ''
+
 def get_output_dir(imdb, net):
     """Return the directory where experimental artifacts are placed.
 

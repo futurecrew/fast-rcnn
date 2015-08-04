@@ -15,4 +15,4 @@ if "%day:~0,1%" == " " set day=0%day:~1,1%
 
 set iters=%1
 set log_file=experiments\logs\faster_rcnn\log_%year%%month%%day%_%hour%%min%%secs%.txt
-tools\train_net.py --gpu 0 --solver models/VGG_CNN_M_1024/rpn/solver.prototxt --weights data/imagenet_models/VGG_CNN_M_1024.v2.caffemodel --proposal rpn --cfg experiments/cfgs/faster_rcnn.yml --iters %iters% 2>&1 | tee %log_file%
+tools\train_net.py --gpu 0 --solver models/VGG_CNN_M_1024/rpn/solver.prototxt --weights data/imagenet_models/VGG_CNN_M_1024.v2.caffemodel --train_target rpn --cfg experiments/cfgs/faster_rcnn.yml --iters %iters% 2>&1 | tee %log_file%

@@ -64,14 +64,14 @@ def prepare_roidb_rpn(imdb):
         gt_classes = roidb[i]['gt_classes']
     
         im = cv2.imread(image_path)
-        resize_scale = im_scale_after_resize(im, cfg.TEST.SCALES[0], cfg.TEST.MAX_SIZE)
+        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)
         
         # Generate anchors based on the resized image
         im_height = int(im.shape[0] * resize_scale)
         im_width = int(im.shape[1] * resize_scale)
         
-        conv_height, scale_height = last_conv_size(im_height)
-        conv_width, scale_width = last_conv_size(im_width)
+        conv_height, scale_height = last_conv_size(im_height, cfg.MODEL_NAME)
+        conv_width, scale_width = last_conv_size(im_width, cfg.MODEL_NAME)
         
         resized_gt_boxes = gt_boxes * resize_scale
         
@@ -189,7 +189,7 @@ def prepare_roidb_rpn(imdb):
         #max_classes = gt_overlaps.argmax(axis=1)
         roidb[i]['max_classes'] = labels
         roidb[i]['bbox_targets'] = bbox_targets
-        roidb[i]['proposal'] = 'rpn'        
+        roidb[i]['train_target'] = 'rpn'        
         #roidb[i]['rois'] = rois
         roidb[i]['resized_gt_boxes'] = resized_gt_boxes
         roidb[i]['conv_width'] = conv_width
@@ -206,14 +206,14 @@ def prepare_roidb_rpn(imdb):
         #assert all(max_classes[nonzero_inds] != 0)
 
 
-def add_bbox_regression_targets(roidb, proposal):
+def add_bbox_regression_targets(roidb, train_target):
     """Add information needed to train bounding-box regressors."""
     assert len(roidb) > 0
     assert 'max_classes' in roidb[0], 'Did you call prepare_roidb first?'
 
     num_images = len(roidb)
     num_classes = roidb[0]['gt_overlaps'].shape[1]
-    if proposal == 'rpn':
+    if train_target == 'rpn':
         # Compute values needed for means and stds
         # var(x) = E(x^2) - E(x)^2
         class_counts = 0

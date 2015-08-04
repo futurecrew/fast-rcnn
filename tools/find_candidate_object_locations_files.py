@@ -16,6 +16,7 @@ from fast_rcnn.config import cfg, cfg_from_file, get_output_dir
 from fast_rcnn.test import _bbox_pred, _clip_boxes
 from utils.cython_nms import nms
 from caffe import nms_cpp
+from caffe import nms_cuda
 #from utils.nms import nms
 #from utils.nms2 import nms
 #from utils.nms3 import nms
@@ -226,10 +227,12 @@ class Detector(object):
             box_info = np.hstack((pred_boxes,
                                   sorted_scores[:, np.newaxis])).astype(np.float32)            
 
+            """
             time1 = time.time()
-            keep1 = nms(box_info, NMS_THRESH, MAX_CANDIDATES)
-            print 'keep1 : %s' % len(keep1)
-            print 'nms %s took %.3f sec' % (len(box_info), time.time() - time1)            
+            keep = nms(box_info, NMS_THRESH, MAX_CANDIDATES)
+            print ''
+            print 'nms %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
+            """            
 
             x1s = np.ascontiguousarray(box_info[:, 0])
             y1s = np.ascontiguousarray(box_info[:, 1])
@@ -237,9 +240,14 @@ class Detector(object):
             y2s = np.ascontiguousarray(box_info[:, 3])
             scores = np.ascontiguousarray(box_info[:, 4])
             time1 = time.time()
-            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH)
-            print 'keep : %s' % len(keep)
-            print 'nms %s took %.3f sec' % (len(box_info), time.time() - time1)
+            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CANDIDATES)
+            print 'nms_cpp %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
+
+            """
+            time1 = time.time()
+            keep = nms_cuda(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CANDIDATES)
+            print 'nms_cuda %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
+            """
             
             pred_boxes = pred_boxes[keep, :]
             pred_boxes = pred_boxes[:MAX_CANDIDATES]
@@ -254,8 +262,6 @@ class Detector(object):
                 
             no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, pred_boxes, match_threshold, sorted_scores, proposal_rects)
 
-            #print 'time7 : %.3f' % time.time()
-            
             no_candidates = len(pred_boxes)
             
             total_no_to_find += no_to_find
@@ -273,7 +279,7 @@ if __name__ == '__main__':
 
     iters = 80000
     
-    TOP_N = 30000
+    TOP_N = 10000
     MAX_CANDIDATES = 2300
     
     caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % iters

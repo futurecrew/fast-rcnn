@@ -30,9 +30,9 @@ def get_minibatch(roidb, num_classes):
     # Get the input image blob, formatted for caffe
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
     
-    if 'proposal' in roidb[0] and roidb[0]['proposal'] == 'rpn':
-        conv_h, scale_h = last_conv_size(im_blob.shape[2])
-        conv_w, scale_w = last_conv_size(im_blob.shape[3])
+    if 'train_target' in roidb[0] and roidb[0]['train_target'] == 'rpn':
+        conv_h, scale_h = last_conv_size(im_blob.shape[2], cfg.MODEL_NAME)
+        conv_w, scale_w = last_conv_size(im_blob.shape[3], cfg.MODEL_NAME)
         
         # Now, build the region of interest and label blobs
         rois_blob = np.zeros((0, 5), dtype=np.float32)
@@ -187,9 +187,6 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
         fg_inds = npr.choice(fg_inds, size=fg_rois_per_this_image,
                              replace=False)
         
-
-    # DJDJ
-    #fg_inds = [6510]        
 
     # Select background RoIs as those within [BG_THRESH_LO, BG_THRESH_HI)
     bg_inds = np.where(labels == 0)[0]
@@ -456,6 +453,11 @@ def _vis_minibatch_rpn(im_blob, conv_h, conv_w, rois_blob, labels_blob, roidb, b
     """Visualize a mini-batch for debugging."""
     import matplotlib.pyplot as plt
     for i in xrange(len(roidb)):
+        
+        # DJDJ
+        if roidb[i]['image'].endswith('000009.jpg') == False:
+            continue
+        
         resized_gt_boxes = roidb[int(i)]['resized_gt_boxes']
         im = im_blob[i, :, :, :].transpose((1, 2, 0)).copy()
         im += cfg.PIXEL_MEANS
