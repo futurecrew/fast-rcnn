@@ -24,10 +24,11 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, roidb, output_dir,
-                 pretrained_model=None, train_target='frcnn'):
+                 pretrained_model=None, train_target='frcnn', proposal='ss'):
         """Initialize the SolverWrapper."""
-        self.output_dir = output_dir
+        self.output_dir = output_dir + '_with_' + proposal
         self.train_target = train_target
+        self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
         self.bbox_means, self.bbox_stds = \
@@ -77,6 +78,7 @@ class SolverWrapper(object):
         infix = ('_' + cfg.TRAIN.SNAPSHOT_INFIX
                  if cfg.TRAIN.SNAPSHOT_INFIX != '' else '')
         filename = (self.solver_param.snapshot_prefix + infix +
+                    '_with_{:s}'.format(self.proposal) + 
                     '_iter_{:d}'.format(self.solver.iter) + '.caffemodel')
         filename = os.path.join(self.output_dir, filename)
 
@@ -136,11 +138,12 @@ def get_training_roidb(imdb, train_target):
 
 def train_net(solver_prototxt, roidb, output_dir,
               pretrained_model=None, max_iters=40000,
-              train_target='frcnn'):
+              train_target='frcnn', proposal='ss'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
-                       train_target=train_target)
+                       train_target=train_target,
+                       proposal=proposal)
 
     print 'Solving...'
     sw.train_model(max_iters)

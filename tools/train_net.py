@@ -106,7 +106,7 @@ if __name__ == '__main__':
     
     cfg.MODEL_NAME = model_name
 
-    imdb = get_imdb(args.imdb_name, train_target)
+    imdb = get_imdb(args.imdb_name, train_target, proposal)
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     
     # DJDJ
@@ -120,4 +120,5 @@ if __name__ == '__main__':
     train_net(args.solver, roidb, output_dir,
               pretrained_model=args.pretrained_model,
               max_iters=args.max_iters,
-              train_target=train_target)
+              train_target=train_target,
+              proposal=proposal)
