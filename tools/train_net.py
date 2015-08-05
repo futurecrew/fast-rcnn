@@ -55,6 +55,9 @@ def parse_args():
     parser.add_argument('--train_target', dest='train_target',
                         help='train target',
                         default='frcnn', type=str)
+    parser.add_argument('--proposal', dest='proposal',
+                        help='proposal to use for train',
+                        default='ss', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -92,6 +95,7 @@ if __name__ == '__main__':
             caffe.set_device(args.gpu_id)
     
     train_target = args.train_target
+    proposal = args.proposal
 
     if 'VGG16' in args.pretrained_model:
         model_name = 'VGG16'

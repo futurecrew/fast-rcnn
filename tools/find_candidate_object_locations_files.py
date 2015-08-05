@@ -133,7 +133,8 @@ class Detector(object):
             
         return no_to_find, no_found
     
-    def gogo(self, TOP_N, MAX_CANDIDATES, voc_base_folder, prototxt, caffemodel, gt, data_list):
+    def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
+             caffemodel, gt, data_list, train_data, step):
         NMS_THRESH = 0.7
         match_threshold = 0.5
         
@@ -147,6 +148,7 @@ class Detector(object):
         no = 0
         total_no_to_find = 0
         total_no_found = 0
+        box_list = []
         input_data = open(data_list).readlines()
         
         for index, file_name in enumerate(input_data):
@@ -184,8 +186,8 @@ class Detector(object):
             width = pos_pred.shape[3]
             proposal_rects = []
 
-            top_index = sorted_pred[:TOP_N]
-            sorted_scores = sorted_scores[:TOP_N]
+            top_index = sorted_pred[:MAX_CAND_BEFORE_NMS]
+            sorted_scores = sorted_scores[:MAX_CAND_BEFORE_NMS]
             axis1 = top_index / height / width
             axis2 = top_index / width % height
             axis3 = top_index % width
@@ -229,7 +231,7 @@ class Detector(object):
 
             """
             time1 = time.time()
-            keep = nms(box_info, NMS_THRESH, MAX_CANDIDATES)
+            keep = nms(box_info, NMS_THRESH, MAX_CAND_AFTER_NMS)
             print ''
             print 'nms %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
             """            
@@ -240,17 +242,17 @@ class Detector(object):
             y2s = np.ascontiguousarray(box_info[:, 3])
             scores = np.ascontiguousarray(box_info[:, 4])
             time1 = time.time()
-            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CANDIDATES)
+            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CAND_AFTER_NMS)
             print 'nms_cpp %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
 
             """
             time1 = time.time()
-            keep = nms_cuda(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CANDIDATES)
+            keep = nms_cuda(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CAND_AFTER_NMS)
             print 'nms_cuda %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
             """
             
             pred_boxes = pred_boxes[keep, :]
-            pred_boxes = pred_boxes[:MAX_CANDIDATES]
+            pred_boxes = pred_boxes[:MAX_CAND_AFTER_NMS]
         
             gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
             
@@ -268,7 +270,17 @@ class Detector(object):
             total_no_found += no_found
              
             print '[%s] accuracy : %.3f' % (no, float(total_no_found) / float(total_no_to_find))  
-                
+            
+            box_list.append(pred_boxes.astype(np.int16))
+        
+        # Save RPN proposal boxes    
+        proposal_file = os.path.join('data', 'rpn_data',
+                '{:s}_{:s}_rpn_top_{:d}_candidate.pkl'.
+                format(train_data, step, MAX_CAND_AFTER_NMS))
+
+        with open(proposal_file, 'wb') as fid:
+            cPickle.dump(box_list, fid, cPickle.HIGHEST_PROTOCOL)
+        print 'wrote rpn roidb to {}'.format(proposal_file)            
 
 if __name__ == '__main__':
     voc_base_folder = 'E:/data/VOCdevkit2/VOC2007/'
@@ -279,16 +291,16 @@ if __name__ == '__main__':
 
     iters = 80000
     
-    TOP_N = 10000
-    MAX_CANDIDATES = 2300
+    MAX_CAND_BEFORE_NMS = 10000
+    MAX_CAND_AFTER_NMS = 2300
     
-    caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % iters
+    train_data_type = 'trainval'
+    train_data = 'voc_2007_%s' % train_data_type
+    step = 'step_1'
+    caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/%s/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % (train_data, iters)
 
-    #data_list = voc_base_folder + '/ImageSets/Main/trainval.txt'
-    #gt = 'E:/project/fast-rcnn/data/cache/voc_2007_trainval_gt_roidb.pkl'
-    
-    data_list = voc_base_folder + '/ImageSets/Main/test.txt'
-    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_test_gt_roidb.pkl'
+    data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % train_data_type
+    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % train_data_type
     
     cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
     cfg_from_file(cfg_file)
@@ -296,4 +308,5 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     
     detector = Detector()
-    detector.gogo(TOP_N, MAX_CANDIDATES, voc_base_folder, prototxt, caffemodel, gt, data_list)
+    detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
+                  caffemodel, gt, data_list, train_data, step)
