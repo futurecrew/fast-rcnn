@@ -18,6 +18,7 @@ import cPickle
 import heapq
 from utils.blob import im_list_to_blob
 import os
+import os.path as osp
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -199,7 +200,10 @@ def im_detect(net, im, boxes):
 
     if cfg.TEST.BBOX_REG:
         # Apply bounding-box regression deltas
-        box_deltas = blobs_out['bbox_pred']
+        if 'bbox_pred_rpn' in blobs_out:
+            box_deltas = blobs_out['bbox_pred_rpn']
+        else:
+            box_deltas = blobs_out['bbox_pred']
         pred_boxes = _bbox_pred(boxes, box_deltas)
         pred_boxes = _clip_boxes(pred_boxes, im.shape)
     else:
@@ -251,7 +255,7 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(net, imdb):
+def test_net(net, imdb, proposal, proposal_file, output_dir):
     """Test a Fast R-CNN network on an image database."""
     num_images = len(imdb.image_index)
     # heuristic: keep an average of 40 detections per class per images prior
@@ -271,7 +275,11 @@ def test_net(net, imdb):
     all_boxes = [[[] for _ in xrange(num_images)]
                  for _ in xrange(imdb.num_classes)]
 
-    output_dir = get_output_dir(imdb, net)
+    if len(output_dir) == 0: 
+        output_dir = get_output_dir(imdb, net)
+    else:
+        output_dir = osp.abspath(output_dir)
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 

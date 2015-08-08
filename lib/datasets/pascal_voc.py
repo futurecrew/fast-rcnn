@@ -16,6 +16,7 @@ import scipy.io as sio
 import utils.cython_bbox
 import cPickle
 import subprocess
+import sys
 from utils.blob import im_scale_after_resize
 from fast_rcnn.config import cfg
 
@@ -23,7 +24,7 @@ from utils.model import last_conv_size
 
 
 class pascal_voc(datasets.imdb):
-    def __init__(self, image_set, year, train_target='frcnn', proposal='ss', devkit_path=None):
+    def __init__(self, image_set, year, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
@@ -40,10 +41,12 @@ class pascal_voc(datasets.imdb):
         self._image_ext = '.jpg'
         self._image_index = self._load_image_set_index()
         
+        self.proposal_file = proposal_file
+        
         # Default to roidb handler
-        if train_target == 'rpn':
+        if model_to_use == 'rpn':
             self._roidb_handler = self.rpn_train_roidb
-        elif train_target == 'frcnn':
+        elif model_to_use == 'frcnn':
             if proposal == 'rpn':
                 self._roidb_handler = self.rpn_proposal_roidb
             elif proposal == 'ss':
@@ -251,12 +254,10 @@ class pascal_voc(datasets.imdb):
         return roidb
     
     def _load_rpn_roidb(self, gt_roidb):
-        filename = os.path.abspath(os.path.join(self.cache_path, '..',
-                                                'rpn_data',
-                                                self.name + '.pkl'))
+        filename = os.path.abspath(self.proposal_file)
         assert os.path.exists(filename), \
                'RPN data not found at: {}'.format(filename)
-        with open(cache_file, 'rb') as fid:
+        with open(filename, 'rb') as fid:
             box_list = cPickle.load(fid)
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
@@ -340,7 +341,19 @@ class pascal_voc(datasets.imdb):
                .format(self._devkit_path, comp_id,
                        self._image_set, output_dir, int(rm_results))
         print('Running:\n{}'.format(cmd))
+        
         status = subprocess.call(cmd, shell=True)
+        """        
+        process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        while True:
+            buff = process.stdout.readline()
+            if buff == '' and process.poll() != None: 
+                break
+            sys.stdout.write(buff)
+        process.wait()
+        """
+
 
     def evaluate_detections(self, all_boxes, output_dir):
         comp_id = self._write_voc_results_file(all_boxes)

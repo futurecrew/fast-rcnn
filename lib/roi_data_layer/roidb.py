@@ -189,7 +189,7 @@ def prepare_roidb_rpn(imdb):
         #max_classes = gt_overlaps.argmax(axis=1)
         roidb[i]['max_classes'] = labels
         roidb[i]['bbox_targets'] = bbox_targets
-        roidb[i]['train_target'] = 'rpn'        
+        roidb[i]['model_to_use'] = 'rpn'        
         #roidb[i]['rois'] = rois
         roidb[i]['resized_gt_boxes'] = resized_gt_boxes
         roidb[i]['conv_width'] = conv_width
@@ -206,14 +206,14 @@ def prepare_roidb_rpn(imdb):
         #assert all(max_classes[nonzero_inds] != 0)
 
 
-def add_bbox_regression_targets(roidb, train_target):
+def add_bbox_regression_targets(roidb, model_to_use):
     """Add information needed to train bounding-box regressors."""
     assert len(roidb) > 0
     assert 'max_classes' in roidb[0], 'Did you call prepare_roidb first?'
 
     num_images = len(roidb)
     num_classes = roidb[0]['gt_overlaps'].shape[1]
-    if train_target == 'rpn':
+    if model_to_use == 'rpn':
         # Compute values needed for means and stds
         # var(x) = E(x^2) - E(x)^2
         class_counts = 0

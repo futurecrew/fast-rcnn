@@ -30,7 +30,7 @@ def get_minibatch(roidb, num_classes):
     # Get the input image blob, formatted for caffe
     im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
     
-    if 'train_target' in roidb[0] and roidb[0]['train_target'] == 'rpn':
+    if 'model_to_use' in roidb[0] and roidb[0]['model_to_use'] == 'rpn':
         conv_h, scale_h = last_conv_size(im_blob.shape[2], cfg.MODEL_NAME)
         conv_w, scale_w = last_conv_size(im_blob.shape[3], cfg.MODEL_NAME)
         

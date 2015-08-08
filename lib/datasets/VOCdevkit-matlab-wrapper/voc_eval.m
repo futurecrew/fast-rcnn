@@ -1,10 +1,12 @@
 function res = voc_eval(path, comp_id, test_set, output_dir, rm_res)
 
+%{
 path = 'E:/data/VOCdevkit2';
-comp_id = 'comp4-3628';
+comp_id = 'comp4-2644';
 test_set = 'test';
-output_dir = 'E:\project\fast-rcnn\output\fast_rcnn\voc_2007_test\vgg_cnn_m_1024_fast_rcnn_iter_40000';
+output_dir = 'E:\project\fast-rcnn\output\fast_rcnn\voc_2007_test\vgg_cnn_m_1024_fast_rcnn_iter_40000_with_step_1_rpn_top_2300';
 rm_res = 1;
+%}
 
 VOCopts = get_voc_opts(path);
 VOCopts.testset = test_set;
@@ -20,6 +22,8 @@ aps = [res(:).ap]';
 fprintf('%.1f\n', aps * 100);
 fprintf('%.1f\n', mean(aps) * 100);
 fprintf('~~~~~~~~~~~~~~~~~~~~\n');
+
+input('enter to continue'); 
 
 function res = voc_eval_cls(cls, VOCopts, comp_id, output_dir, rm_res)
 

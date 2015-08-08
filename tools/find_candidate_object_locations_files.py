@@ -3,6 +3,9 @@ import os
 import cv2
 import cPickle
 import time
+import sys
+import argparse
+import pprint
 from skimage import io
 import numpy as np
 from caffe.proto import caffe_pb2
@@ -132,9 +135,33 @@ class Detector(object):
             """
             
         return no_to_find, no_found
+
+    # Delete out of range rows
+    def _remove_out_of_ranges(self, boxes, scores, img_height, img_width):
+        out_of_range = np.where(boxes[:, 0] >= img_width - 1)[0]            
+        if len(out_of_range) > 0:
+            boxes = np.delete(boxes, out_of_range, 0)
+            scores = np.delete(scores, out_of_range, 0)
+    
+        out_of_range = np.where(boxes[:, 1] >= img_height - 1)[0]            
+        if len(out_of_range) > 0:
+            boxes = np.delete(boxes, out_of_range, 0)
+            scores = np.delete(scores, out_of_range, 0)
+    
+        out_of_range = np.where(boxes[:, 2] < 0)[0]            
+        if len(out_of_range) > 0:
+            boxes = np.delete(boxes, out_of_range, 0)
+            scores = np.delete(scores, out_of_range, 0)
+    
+        out_of_range = np.where(boxes[:, 3] < 0)[0]            
+        if len(out_of_range) > 0:
+            boxes = np.delete(boxes, out_of_range, 0)
+            scores = np.delete(scores, out_of_range, 0)
+            
+        return boxes, scores
     
     def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
-             caffemodel, gt, data_list, train_data, step):
+             caffemodel, gt, data_list, test_data, step):
         NMS_THRESH = 0.7
         match_threshold = 0.5
         
@@ -148,7 +175,7 @@ class Detector(object):
         no = 0
         total_no_to_find = 0
         total_no_found = 0
-        box_list = []
+        box_list_to_save = []
         input_data = open(data_list).readlines()
         
         for index, file_name in enumerate(input_data):
@@ -166,6 +193,9 @@ class Detector(object):
             
             im = cv2.imread(image_folder + '/' + file_name + '.jpg')
             
+            org_img_height = im.shape[0]
+            org_img_width = im.shape[1]
+            
             blobs = {'data' : None}
             blobs['data'], im_scale_factors = _get_image_blob(im)
             
@@ -177,7 +207,10 @@ class Detector(object):
             #print 'time2 : %.3f' % time.time()
 
             cls_pred = blobs_out['cls_pred']
-            box_deltas = blobs_out['bbox_pred']
+            if 'bbox_pred_rpn' in blobs_out:
+                box_deltas = blobs_out['bbox_pred_rpn']
+            else:
+                box_deltas = blobs_out['bbox_pred']
             
             pos_pred = cls_pred[:, :, 1, :, :]
             sorted_pred = np.argsort(pos_pred, axis=None)[::-1]
@@ -192,8 +225,8 @@ class Detector(object):
             axis2 = top_index / width % height
             axis3 = top_index % width
             
-            img_height = blobs['data'].shape[2]
-            img_width = blobs['data'].shape[3]
+            resized_img_height = blobs['data'].shape[2]
+            resized_img_width = blobs['data'].shape[3]
 
 
             # DJDJ
@@ -208,7 +241,8 @@ class Detector(object):
             
             #print 'time3 : %.3f' % time.time()
         
-            proposal_rects = self.get_img_rect(img_height, img_width, pos_pred.shape[2], pos_pred.shape[3], axis1, axis2, axis3)
+            proposal_rects = self.get_img_rect(resized_img_height, resized_img_width, 
+                                               pos_pred.shape[2], pos_pred.shape[3], axis1, axis2, axis3)
             
             #print 'time4 : %.3f' % time.time()
             
@@ -224,7 +258,31 @@ class Detector(object):
             box_deltas_rects[:, 3] = box_deltas[0, axis1*4+3, axis2, axis3]
 
             pred_boxes = _bbox_pred(proposal_rects, box_deltas_rects)
-            pred_boxes = _clip_boxes(pred_boxes, (img_height, img_width))            
+
+            #print 'img_height : %s' % img_height
+            #print 'img_width : %s' % img_width
+            
+            # Delete out of range rows
+            pred_boxes, sorted_scores = self._remove_out_of_ranges(pred_boxes, sorted_scores, 
+                                              resized_img_height, resized_img_width)
+            
+            
+            """
+            for i in range(len(pred_boxes)):
+                if pred_boxes[i, 0] > pred_boxes[i, 2]:
+                    print '[ error 2 ]'
+                    print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
+            """
+
+            pred_boxes = _clip_boxes(pred_boxes, (resized_img_height, resized_img_width))            
+            
+            """
+            for i in range(len(pred_boxes)):
+                if pred_boxes[i, 0] > pred_boxes[i, 2]:
+                    print '[ error 3 ]'
+                    print 'file_name : %s' % file_name
+                    print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
+            """
             
             box_info = np.hstack((pred_boxes,
                                   sorted_scores[:, np.newaxis])).astype(np.float32)            
@@ -271,16 +329,63 @@ class Detector(object):
              
             print '[%s] accuracy : %.3f' % (no, float(total_no_found) / float(total_no_to_find))  
             
-            box_list.append(pred_boxes.astype(np.int16))
+            """
+            for i in range(len(pred_boxes)):
+                if pred_boxes[i, 0] > pred_boxes[i, 2]:
+                    print '[ error end ]'
+                    print 'file_name : %s' % file_name
+                    print 'resized_img_height : %s' % resized_img_height
+                    print 'resized_img_width : %s' % resized_img_width
+                    print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
+            """
+            
+            pred_boxes = pred_boxes / im_scale_factors
+            
+            assert (pred_boxes[:, 0] >= 0).all()
+            assert (pred_boxes[:, 1] >= 0).all()
+            assert (pred_boxes[:, 2] < org_img_width).all()
+            assert (pred_boxes[:, 3] < org_img_height).all()
+            assert (pred_boxes[:, 2] >= pred_boxes[:, 0]).all()
+            assert (pred_boxes[:, 3] >= pred_boxes[:, 1]).all()
+                        
+            box_list_to_save.append(pred_boxes.astype(np.int16))
         
         # Save RPN proposal boxes    
         proposal_file = os.path.join('data', 'rpn_data',
                 '{:s}_{:s}_rpn_top_{:d}_candidate.pkl'.
-                format(train_data, step, MAX_CAND_AFTER_NMS))
+                format(test_data, step, MAX_CAND_AFTER_NMS))
 
         with open(proposal_file, 'wb') as fid:
-            cPickle.dump(box_list, fid, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote rpn roidb to {}'.format(proposal_file)            
+
+def parse_args():
+    """
+    Parse input arguments
+    """
+    parser = argparse.ArgumentParser(description='Generate RPN detections')
+    parser.add_argument('--weights', dest='pretrained_model',
+                        help='initialize with pretrained model weights',
+                        default=None, type=str)
+    parser.add_argument('--cfg', dest='cfg_file',
+                        help='optional config file',
+                        default=None, type=str)
+    parser.add_argument('--data_type', dest='data_type',
+                        help='data_type(trainval or test)',
+                        default=None, type=str)
+    parser.add_argument('--step', dest='step',
+                        help='step(1 or 3)',
+                        default=None, type=str)
+    parser.add_argument('--max_output', dest='max_output',
+                        help='Maximum number of candidates',
+                        default=2300, type=int)
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
+
+    args = parser.parse_args()
+    return args
 
 if __name__ == '__main__':
     voc_base_folder = 'E:/data/VOCdevkit2/VOC2007/'
@@ -292,21 +397,30 @@ if __name__ == '__main__':
     iters = 80000
     
     MAX_CAND_BEFORE_NMS = 10000
-    MAX_CAND_AFTER_NMS = 2300
     
-    train_data_type = 'trainval'
-    train_data = 'voc_2007_%s' % train_data_type
-    step = 'step_1'
-    caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn/%s/vgg_cnn_m_1024_rpn_iter_%s.caffemodel' % (train_data, iters)
+    args = parse_args()
 
-    data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % train_data_type
-    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % train_data_type
+    print('Called with args:')
+    print(args)
+
+    if args.cfg_file is not None:
+        cfg_from_file(args.cfg_file)
+
+    print('Using config:')
+    pprint.pprint(cfg)
+
+    test_data = 'voc_2007_%s' % args.data_type
+    step = 'step_%s' % args.step
+    caffemodel = args.pretrained_model
+    MAX_CAND_AFTER_NMS = args.max_output
+
+    data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % args.data_type
+    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
     
-    cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
-    cfg_from_file(cfg_file)
+    #cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
 
     caffe.set_mode_gpu()
     
     detector = Detector()
     detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
-                  caffemodel, gt, data_list, train_data, step)
+                  caffemodel, gt, data_list, test_data, step)

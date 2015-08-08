@@ -447,10 +447,10 @@ layer {
   }
 }
 layer {
-  name: "bbox_pred"
+  name: "bbox_pred_rpn"
   type: "Convolution"
   bottom: "conv_rpn_feature"
-  top: "bbox_pred"
+  top: "bbox_pred_rpn"
   param {
     lr_mult: 1
     decay_mult: 1

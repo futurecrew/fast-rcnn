@@ -24,15 +24,18 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, roidb, output_dir,
-                 pretrained_model=None, train_target='frcnn', proposal='ss'):
+                 pretrained_model=None, model_to_use='frcnn', proposal='ss'):
         """Initialize the SolverWrapper."""
-        self.output_dir = output_dir + '_with_' + proposal
-        self.train_target = train_target
+        self.output_dir = output_dir
+        if model_to_use == 'frcnn':
+           self.output_dir = self.output_dir + '_with_' + proposal
+           
+        self.model_to_use = model_to_use
         self.proposal = proposal
 
         print 'Computing bounding-box regression targets...'
         self.bbox_means, self.bbox_stds = \
-                rdl_roidb.add_bbox_regression_targets(roidb, train_target)
+                rdl_roidb.add_bbox_regression_targets(roidb, model_to_use)
         print 'done'
 
         self.solver = caffe.SGDSolver(solver_prototxt)
@@ -53,23 +56,28 @@ class SolverWrapper(object):
         bounding-box regression weights. This enables easy use at test-time.
         """
         net = self.solver.net
-
+        
         if cfg.TRAIN.BBOX_REG:
+            if 'bbox_pred_rpn' in net.params:
+                bbox_pred = 'bbox_pred_rpn'
+            else:
+                bbox_pred = 'bbox_pred'
+                
             # save original values
-            orig_0 = net.params['bbox_pred'][0].data.copy()
-            orig_1 = net.params['bbox_pred'][1].data.copy()
+            orig_0 = net.params[bbox_pred][0].data.copy()
+            orig_1 = net.params[bbox_pred][1].data.copy()
 
             if cfg.TRAIN.NORMALIZE_BBOX:
                 # scale and shift with bbox reg unnormalization; then save snapshot
-                if self.train_target == 'rpn':
+                if self.model_to_use == 'rpn':
                     extended_stds = self.bbox_stds[:, np.newaxis, np.newaxis, np.newaxis]
                 else:
                     extended_stds = self.bbox_stds[:, np.newaxis]
-                net.params['bbox_pred'][0].data[...] = \
-                        (net.params['bbox_pred'][0].data *
+                net.params[bbox_pred][0].data[...] = \
+                        (net.params[bbox_pred][0].data *
                          extended_stds)
-                net.params['bbox_pred'][1].data[...] = \
-                        (net.params['bbox_pred'][1].data *
+                net.params[bbox_pred][1].data[...] = \
+                        (net.params[bbox_pred][1].data *
                          self.bbox_stds + self.bbox_means)
 
         if not os.path.exists(self.output_dir):
@@ -87,8 +95,8 @@ class SolverWrapper(object):
 
         if cfg.TRAIN.BBOX_REG:
             # restore net to original state
-            net.params['bbox_pred'][0].data[...] = orig_0
-            net.params['bbox_pred'][1].data[...] = orig_1
+            net.params[bbox_pred][0].data[...] = orig_0
+            net.params[bbox_pred][1].data[...] = orig_1
 
     def train_model(self, max_iters):
         """Network training loop."""
@@ -120,7 +128,7 @@ class SolverWrapper(object):
         if last_snapshot_iter != self.solver.iter:
             self.snapshot()
 
-def get_training_roidb(imdb, train_target):
+def get_training_roidb(imdb, model_to_use):
     """Returns a roidb (Region of Interest database) for use in training."""
     if cfg.TRAIN.USE_FLIPPED:
         print 'Appending horizontally-flipped training examples...'
@@ -128,7 +136,7 @@ def get_training_roidb(imdb, train_target):
         print 'done'
 
     print 'Preparing training data...'
-    if train_target == 'rpn':
+    if model_to_use == 'rpn':
         rdl_roidb.prepare_roidb_rpn(imdb)
     else:
         rdl_roidb.prepare_roidb(imdb)
@@ -138,11 +146,11 @@ def get_training_roidb(imdb, train_target):
 
 def train_net(solver_prototxt, roidb, output_dir,
               pretrained_model=None, max_iters=40000,
-              train_target='frcnn', proposal='ss'):
+              model_to_use='frcnn', proposal='ss'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, roidb, output_dir,
                        pretrained_model=pretrained_model,
-                       train_target=train_target,
+                       model_to_use=model_to_use,
                        proposal=proposal)
 
     print 'Solving...'

@@ -41,6 +41,18 @@ def parse_args():
                         default='voc_2007_test', type=str)
     parser.add_argument('--comp', dest='comp_mode', help='competition mode',
                         action='store_true')
+    parser.add_argument('--model_to_use', dest='model_to_use',
+                        help='train model',
+                        default='frcnn', type=str)
+    parser.add_argument('--proposal', dest='proposal',
+                        help='proposal type to use for test',
+                        default='ss', type=str)
+    parser.add_argument('--proposal_file', dest='proposal_file',
+                        help='proposal file to use for test',
+                        default='', type=str)
+    parser.add_argument('--output_dir', dest='output_dir',
+                        help='output directory',
+                        default='', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -70,7 +82,24 @@ if __name__ == '__main__':
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
     net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
 
-    imdb = get_imdb(args.imdb_name)
+    model_to_use = args.model_to_use
+    proposal = args.proposal
+    proposal_file = args.proposal_file
+    output_dir = args.output_dir
+
+    if 'VGG16' in args.caffemodel.upper():
+        model_name = 'VGG16'
+    elif 'VGG_CNN_M_1024' in args.caffemodel.upper():
+        model_name = 'VGG_CNN_M_1024'
+    else:
+        raise Exception("This model is not supported. %s" % args.caffemodel)
+    
+    cfg.MODEL_NAME = model_name
+
+    imdb = get_imdb(args.imdb_name, model_to_use=model_to_use, proposal=proposal, proposal_file=proposal_file)
     imdb.competition_mode(args.comp_mode)
 
-    test_net(net, imdb)
+    # DJDJ
+    #imdb.evaluate_detections(None, output_dir)
+    
+    test_net(net, imdb, proposal, proposal_file, output_dir)

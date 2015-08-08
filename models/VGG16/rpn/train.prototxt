@@ -437,10 +437,10 @@ layer {
   }
 }
 layer {
-  name: "bbox_pred"
+  name: "bbox_pred_rpn"
   type: "Convolution"
   bottom: "conv_rpn_feature"
-  top: "bbox_pred"
+  top: "bbox_pred_rpn"
   param {
     lr_mult: 1
     decay_mult: 1
@@ -494,7 +494,7 @@ layer {
 layer {
   name: "loss_bbox"
   type: "SmoothL1Loss"
-  bottom: "bbox_pred"
+  bottom: "bbox_pred_rpn"
   bottom: "bbox_targets"
   bottom: "bbox_loss_weights"
   bottom: "batch_size"
