@@ -18,6 +18,7 @@ from utils.model import last_conv_size
 from fast_rcnn.config import cfg, cfg_from_file, get_output_dir
 from fast_rcnn.test import _bbox_pred, _clip_boxes
 from utils.cython_nms import nms
+from utils.box_prediction import get_predicted_boxes
 from caffe import nms_cpp
 from caffe import nms_cuda
 #from utils.nms import nms
@@ -25,30 +26,7 @@ from caffe import nms_cuda
 #from utils.nms3 import nms
 
 class Detector(object):
-    
-    def get_img_rect(self, img_height, img_width, conv_height, conv_width, axis1, axis2, axis3):
-
-        anchors = np.array([[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
-                           [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
-                           [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]])
-                
-        img_center_x = img_width * axis3 / conv_width
-        img_center_y = img_height * axis2 / conv_height
-        anchor_size = anchors[axis1]
-        img_x1 = img_center_x - anchor_size[:, 0] / 2 
-        img_x2 = img_center_x + anchor_size[:, 0] / 2 
-        img_y1 = img_center_y - anchor_size[:, 1] / 2 
-        img_y2 = img_center_y + anchor_size[:, 1] / 2 
-        
-        img_rect = np.zeros((len(axis1), 4), np.float32)
-        img_rect[:, 0] = img_x1
-        img_rect[:, 1] = img_y1
-        img_rect[:, 2] = img_x2
-        img_rect[:, 3] = img_y2
-        
-        return img_rect
-
-    def check_match(self, file_name, im_blob, ground_rects, pred_rects, match_threshold, scores, proposal_rects):
+    def check_match(self, file_name, im_blob, ground_rects, pred_rects, match_threshold, scores, rigid_rects):
         found_rects = []
         
         no_to_find = len(ground_rects)
@@ -109,7 +87,7 @@ class Detector(object):
             
             
             """
-            for pred_rect, score, proposal_rect in zip(pred_rects, scores, proposal_rects):
+            for pred_rect, score, rigid_rect in zip(pred_rects, scores, rigid_rects):
                 plt.imshow(im)
                 for ground_rect in ground_rects: 
                     plt.gca().add_patch(
@@ -118,8 +96,8 @@ class Detector(object):
                                       edgecolor='b', linewidth=3)
                         )
                 plt.gca().add_patch(
-                    plt.Rectangle((proposal_rect[0], proposal_rect[1]), proposal_rect[2] - proposal_rect[0],
-                                  proposal_rect[3] - proposal_rect[1], fill=False,
+                    plt.Rectangle((rigid_rect[0], rigid_rect[1]), rigid_rect[2] - rigid_rect[0],
+                                  rigid_rect[3] - rigid_rect[1], fill=False,
                                   edgecolor='g', linewidth=3)
                     )
                 plt.gca().add_patch(
@@ -136,29 +114,6 @@ class Detector(object):
             
         return no_to_find, no_found
 
-    # Delete out of range rows
-    def _remove_out_of_ranges(self, boxes, scores, img_height, img_width):
-        out_of_range = np.where(boxes[:, 0] >= img_width - 1)[0]            
-        if len(out_of_range) > 0:
-            boxes = np.delete(boxes, out_of_range, 0)
-            scores = np.delete(scores, out_of_range, 0)
-    
-        out_of_range = np.where(boxes[:, 1] >= img_height - 1)[0]            
-        if len(out_of_range) > 0:
-            boxes = np.delete(boxes, out_of_range, 0)
-            scores = np.delete(scores, out_of_range, 0)
-    
-        out_of_range = np.where(boxes[:, 2] < 0)[0]            
-        if len(out_of_range) > 0:
-            boxes = np.delete(boxes, out_of_range, 0)
-            scores = np.delete(scores, out_of_range, 0)
-    
-        out_of_range = np.where(boxes[:, 3] < 0)[0]            
-        if len(out_of_range) > 0:
-            boxes = np.delete(boxes, out_of_range, 0)
-            scores = np.delete(scores, out_of_range, 0)
-            
-        return boxes, scores
     
     def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
              caffemodel, gt, data_list, test_data, step):
@@ -212,105 +167,11 @@ class Detector(object):
             else:
                 box_deltas = blobs_out['bbox_pred']
             
-            pos_pred = cls_pred[:, :, 1, :, :]
-            sorted_pred = np.argsort(pos_pred, axis=None)[::-1]
-            sorted_scores = np.sort(pos_pred, axis=None)[::-1]
-            height = pos_pred.shape[2]
-            width = pos_pred.shape[3]
-            proposal_rects = []
-
-            top_index = sorted_pred[:MAX_CAND_BEFORE_NMS]
-            sorted_scores = sorted_scores[:MAX_CAND_BEFORE_NMS]
-            axis1 = top_index / height / width
-            axis2 = top_index / width % height
-            axis3 = top_index % width
             
-            resized_img_height = blobs['data'].shape[2]
-            resized_img_width = blobs['data'].shape[3]
-
-
-            # DJDJ
-            """
-            axis1 = np.array([2, 2, 2, 2])
-            axis2 = np.array([22, 22, 22, 22])
-            axis3 = np.array([26, 28, 30, 32])
-            top_index = axis1 * pos_pred.shape[2] * pos_pred.shape[3] + axis2 * pos_pred.shape[3] + axis3
-            sorted_scores = sorted_scores[top_index]
-            """
-            
-            
-            #print 'time3 : %.3f' % time.time()
-        
-            proposal_rects = self.get_img_rect(resized_img_height, resized_img_width, 
-                                               pos_pred.shape[2], pos_pred.shape[3], axis1, axis2, axis3)
-            
-            #print 'time4 : %.3f' % time.time()
-            
-            """
-            print ''
-            print 'proposal_rects[0] : %s' % proposal_rects[0]            
-            """
-
-            box_deltas_rects = np.zeros((len(axis1), 4), np.float32)
-            box_deltas_rects[:, 0] = box_deltas[0, axis1*4, axis2, axis3]
-            box_deltas_rects[:, 1] = box_deltas[0, axis1*4+1, axis2, axis3]
-            box_deltas_rects[:, 2] = box_deltas[0, axis1*4+2, axis2, axis3]
-            box_deltas_rects[:, 3] = box_deltas[0, axis1*4+3, axis2, axis3]
-
-            pred_boxes = _bbox_pred(proposal_rects, box_deltas_rects)
-
-            #print 'img_height : %s' % img_height
-            #print 'img_width : %s' % img_width
-            
-            # Delete out of range rows
-            pred_boxes, sorted_scores = self._remove_out_of_ranges(pred_boxes, sorted_scores, 
-                                              resized_img_height, resized_img_width)
-            
-            
-            """
-            for i in range(len(pred_boxes)):
-                if pred_boxes[i, 0] > pred_boxes[i, 2]:
-                    print '[ error 2 ]'
-                    print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
-            """
-
-            pred_boxes = _clip_boxes(pred_boxes, (resized_img_height, resized_img_width))            
-            
-            """
-            for i in range(len(pred_boxes)):
-                if pred_boxes[i, 0] > pred_boxes[i, 2]:
-                    print '[ error 3 ]'
-                    print 'file_name : %s' % file_name
-                    print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
-            """
-            
-            box_info = np.hstack((pred_boxes,
-                                  sorted_scores[:, np.newaxis])).astype(np.float32)            
-
-            """
-            time1 = time.time()
-            keep = nms(box_info, NMS_THRESH, MAX_CAND_AFTER_NMS)
-            print ''
-            print 'nms %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
-            """            
-
-            x1s = np.ascontiguousarray(box_info[:, 0])
-            y1s = np.ascontiguousarray(box_info[:, 1])
-            x2s = np.ascontiguousarray(box_info[:, 2])
-            y2s = np.ascontiguousarray(box_info[:, 3])
-            scores = np.ascontiguousarray(box_info[:, 4])
-            time1 = time.time()
-            keep = nms_cpp(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CAND_AFTER_NMS)
-            print 'nms_cpp %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
-
-            """
-            time1 = time.time()
-            keep = nms_cuda(x1s, y1s, x2s, y2s, scores, NMS_THRESH, MAX_CAND_AFTER_NMS)
-            print 'nms_cuda %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
-            """
-            
-            pred_boxes = pred_boxes[keep, :]
-            pred_boxes = pred_boxes[:MAX_CAND_AFTER_NMS]
+            rigid_rects, pred_boxes, sorted_scores = get_predicted_boxes(cls_pred, box_deltas,
+                                           blobs['data'].shape[2], blobs['data'].shape[3],
+                                           NMS_THRESH, MAX_CAND_BEFORE_NMS,
+                                           MAX_CAND_AFTER_NMS)
         
             gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
             
@@ -320,7 +181,9 @@ class Detector(object):
             #for gt_box in gt_boxes:
             #    print 'gt_box : %s' % (gt_box, )
                 
-            no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, pred_boxes, match_threshold, sorted_scores, proposal_rects)
+            no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, 
+                                                    pred_boxes, match_threshold, 
+                                                    sorted_scores, rigid_rects)
 
             no_candidates = len(pred_boxes)
             
@@ -334,8 +197,8 @@ class Detector(object):
                 if pred_boxes[i, 0] > pred_boxes[i, 2]:
                     print '[ error end ]'
                     print 'file_name : %s' % file_name
-                    print 'resized_img_height : %s' % resized_img_height
-                    print 'resized_img_width : %s' % resized_img_width
+                    print 'img_width_for_train : %s' % img_height_for_train
+                    print 'img_width_for_train : %s' % img_width_for_train
                     print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
             """
             

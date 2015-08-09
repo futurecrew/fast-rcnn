@@ -102,7 +102,8 @@ def _get_blobs(im, rois):
     """Convert an image and RoIs within that image into network inputs."""
     blobs = {'data' : None, 'rois' : None}
     blobs['data'], im_scale_factors = _get_image_blob(im)
-    blobs['rois'] = _get_rois_blob(rois, im_scale_factors)
+    if rois != None:
+        blobs['rois'] = _get_rois_blob(rois, im_scale_factors)
     return blobs, im_scale_factors
 
 def _bbox_pred(boxes, box_deltas):
@@ -214,6 +215,43 @@ def im_detect(net, im, boxes):
         # Map scores and predictions back to the original set of boxes
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
+
+    return scores, pred_boxes
+
+def im_detect_mixed(net, im):
+    """Detect object classes in an image given object proposals.
+
+    Arguments:
+        net (caffe.Net): Fast R-CNN network to use
+        im (ndarray): color image to test (in BGR order)
+        boxes (ndarray): R x 4 array of object proposals
+
+    Returns:
+        scores (ndarray): R x K array of object class scores (K includes
+            background as object category 0)
+        boxes (ndarray): R x (4*K) array of predicted bounding boxes
+    """
+    blobs, unused_im_scale_factors = _get_blobs(im, None)
+
+    # reshape network inputs
+    net.blobs['data'].reshape(*(blobs['data'].shape))
+    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False))
+    if cfg.TEST.SVM:
+        # use the raw scores before softmax under the assumption they
+        # were trained as linear SVMs
+        scores = net.blobs['cls_score'].data
+    else:
+        # use softmax estimated probabilities
+        scores = blobs_out['cls_prob']
+    boxes = net.blobs['rois'].data[:, 1:]
+    if cfg.TEST.BBOX_REG:
+        # Apply bounding-box regression deltas
+        box_deltas = blobs_out['bbox_pred']
+        pred_boxes = _bbox_pred(boxes, box_deltas)
+        pred_boxes = _clip_boxes(pred_boxes, im.shape)
+    else:
+        # Simply repeat the boxes, once for each class
+        pred_boxes = np.tile(boxes, (1, scores.shape[1]))
 
     return scores, pred_boxes
 

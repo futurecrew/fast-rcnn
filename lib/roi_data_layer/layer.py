@@ -16,6 +16,7 @@ from roi_data_layer.minibatch import get_minibatch
 import numpy as np
 import yaml
 from multiprocessing import Process, Queue
+from utils.model import last_conv_size
 
 class RoIDataLayer(caffe.Layer):
     """Fast R-CNN data layer used for training."""
@@ -83,21 +84,23 @@ class RoIDataLayer(caffe.Layer):
             # data blob: holds a batch of N images, each with 3 channels
             # The height and width (100 x 100) are dummy values
             top[0].reshape(1, 3, 100, 100)
+            
+            conv_size, scale = last_conv_size(100, cfg.MODEL_NAME)
     
             # labels blob: R categorical labels in 9 anchors for the final 
             # convolution layer
-            top[1].reshape(1, 9, 5, 5)
+            top[1].reshape(1, 9, conv_size, conv_size)
     
             if cfg.TRAIN.BBOX_REG:
                 self._name_to_top_map['bbox_targets'] = 2
                 self._name_to_top_map['bbox_loss_weights'] = 3
 
                 # bbox_targets blob: R bounding-box regression targets with 4 targets
-                top[2].reshape(1, 36, 5, 5)
+                top[2].reshape(1, 36, conv_size, conv_size)
     
                 # bbox_loss_weights blob: At most 4 targets are active;
                 # this binary vector specifies the subset of active targets
-                top[3].reshape(1, 36, 5, 5)
+                top[3].reshape(1, 36, conv_size, conv_size)
                 
                 top[4].reshape(1)
                 batch_size_data = np.zeros((1, 1))

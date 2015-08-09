@@ -15,7 +15,7 @@ See README.md for installation instructions before running.
 
 import _init_paths
 from fast_rcnn.config import cfg
-from fast_rcnn.test import im_detect
+from fast_rcnn.test import im_detect, im_detect_mixed
 from utils.cython_nms import nms
 from utils.timer import Timer
 import matplotlib
@@ -78,13 +78,14 @@ def vis_detections(im, class_name, dets, thresh=0.5):
     plt.tight_layout()
     plt.draw()
 
-def demo(net, image_name, classes):
+def demo(net, image_name, classes, mixed=False):
     """Detect object classes in an image using pre-computed object proposals."""
 
-    # Load pre-computed Selected Search object proposals
-    box_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo',
-                            image_name + '_boxes.mat')
-    obj_proposals = sio.loadmat(box_file)['boxes']
+    if mixed == False:
+        # Load pre-computed Selected Search object proposals
+        box_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo',
+                                image_name + '_boxes.mat')
+        obj_proposals = sio.loadmat(box_file)['boxes']
     
     
     
@@ -96,10 +97,13 @@ def demo(net, image_name, classes):
     im = cv2.imread(im_file)
 
     # Detect all object classes and regress object bounds
-    for i in range(1):
+    for i in range(3):
         timer = Timer()
         timer.tic()
-        scores, boxes = im_detect(net, im, obj_proposals)
+        if mixed:
+            scores, boxes = im_detect_mixed(net, im)
+        else:
+            scores, boxes = im_detect(net, im, obj_proposals)
         timer.toc()
         print ('Detection took {:.3f}s for '
                '{:d} object proposals').format(timer.total_time, boxes.shape[0])
@@ -107,17 +111,23 @@ def demo(net, image_name, classes):
     # Visualize detections for each class
     CONF_THRESH = 0.8
     NMS_THRESH = 0.3
+    timer = Timer()
     for cls in classes:
         cls_ind = CLASSES.index(cls)
         cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
         cls_scores = scores[:, cls_ind]
         dets = np.hstack((cls_boxes,
                           cls_scores[:, np.newaxis])).astype(np.float32)
+        
+        timer.tic()
         keep = nms(dets, NMS_THRESH)
+        timer.toc()
+        
         dets = dets[keep, :]
         print 'All {} detections with p({} | box) >= {:.1f}'.format(cls, cls,
                                                                     CONF_THRESH)
         vis_detections(im, cls, dets, thresh=CONF_THRESH)
+    print ('nms took {:.3f}s').format(timer.total_time)        
 
 def parse_args():
     """Parse input arguments."""
@@ -142,6 +152,15 @@ if __name__ == '__main__':
     caffemodel = os.path.join(cfg.ROOT_DIR, 'data', 'fast_rcnn_models',
                               NETS[args.demo_net][1])
 
+    prototxt_mixed = os.path.join(cfg.ROOT_DIR, 'models', NETS[args.demo_net][0],
+                            'rpn', 'test_mixed.prototxt')
+    caffemodel_mixed_frcnn = os.path.join(cfg.ROOT_DIR, 'output', 'fast_rcnn',
+                              'voc_2007_trainval_with_rpn', 
+                              'vgg_cnn_m_1024_fast_rcnn_step4_with_rpn_iter_80000.caffemodel')
+    caffemodel_mixed_rpn = os.path.join(cfg.ROOT_DIR, 'output', 'faster_rcnn',
+                              'voc_2007_trainval', 
+                              'vgg_cnn_m_1024_rpn_step3_iter_80000.caffemodel')
+
     if not os.path.isfile(caffemodel):
         raise IOError(('{:s} not found.\nDid you run ./data/script/'
                        'fetch_fast_rcnn_models.sh?').format(caffemodel))
@@ -152,18 +171,29 @@ if __name__ == '__main__':
         caffe.set_mode_gpu()
         caffe.set_device(args.gpu_id)
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
+    
+    net_mixed = caffe.Net(prototxt_mixed, caffe.TEST)
+    net_mixed.copy_from(caffemodel_mixed_frcnn)
+    net_mixed.copy_from(caffemodel_mixed_rpn)
 
     print '\n\nLoaded network {:s}'.format(caffemodel)
 
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/000004.jpg'
-    demo(net, '000004', ('car',))
+    demo(net, '000004', ('car',), mixed=False)
+    plt.show()
 
+    demo(net_mixed, '000004', ('car',), mixed=True)
+    plt.show()
+
+    """
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/001551.jpg'
-    demo(net, '001551', ('sofa', 'tvmonitor'))
+    demo(net, '001551', ('sofa', 'tvmonitor'), mixed=False)
+    plt.show()
 
-    #plt.show()
-    
+    demo(net_mixed, '001551', ('sofa', 'tvmonitor'), mixed=True)
+    plt.show()
+    """
     
     

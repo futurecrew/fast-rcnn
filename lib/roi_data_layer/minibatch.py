@@ -12,7 +12,6 @@ import numpy.random as npr
 import cv2
 from fast_rcnn.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
-
 from utils.model import last_conv_size
 
 def get_minibatch(roidb, num_classes):
@@ -455,8 +454,8 @@ def _vis_minibatch_rpn(im_blob, conv_h, conv_w, rois_blob, labels_blob, roidb, b
     for i in xrange(len(roidb)):
         
         # DJDJ
-        if roidb[i]['image'].endswith('000009.jpg') == False:
-            continue
+        #if roidb[i]['image'].endswith('000009.jpg') == False:
+        #    continue
         
         resized_gt_boxes = roidb[int(i)]['resized_gt_boxes']
         im = im_blob[i, :, :, :].transpose((1, 2, 0)).copy()
