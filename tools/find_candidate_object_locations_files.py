@@ -86,7 +86,7 @@ class Detector(object):
             
             
             
-            """
+            
             for pred_rect, score, rigid_rect in zip(pred_rects, scores, rigid_rects):
                 plt.imshow(im)
                 for ground_rect in ground_rects: 
@@ -110,7 +110,7 @@ class Detector(object):
                 plt.show(block=False)
                 raw_input("")
                 plt.close()
-            """
+            
             
         return no_to_find, no_found
 
@@ -173,7 +173,12 @@ class Detector(object):
                                            NMS_THRESH, MAX_CAND_BEFORE_NMS,
                                            MAX_CAND_AFTER_NMS)
         
-            gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
+            # Rescale boxes back according to the original image size
+            pred_boxes = pred_boxes / im_scale_factors[0]        
+            gt_boxes = gtdb[no-1]['boxes']
+            
+            #gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
+
             
             #for pred_box in pred_boxes:
             #    print 'pred_box : %s' % (pred_box, )
@@ -201,8 +206,6 @@ class Detector(object):
                     print 'img_width_for_train : %s' % img_width_for_train
                     print 'pred_boxes[%s] : %s' % (i, pred_boxes[i])
             """
-            
-            pred_boxes = pred_boxes / im_scale_factors
             
             assert (pred_boxes[:, 0] >= 0).all()
             assert (pred_boxes[:, 1] >= 0).all()
