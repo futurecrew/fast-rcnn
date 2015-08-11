@@ -21,9 +21,7 @@ from utils.cython_nms import nms
 from utils.box_prediction import get_predicted_boxes
 from caffe import nms_cpp
 from caffe import nms_cuda
-#from utils.nms import nms
-#from utils.nms2 import nms
-#from utils.nms3 import nms
+from util import prevent_sleep
 
 class Detector(object):
     def check_match(self, file_name, im_blob, ground_rects, pred_rects, match_threshold, scores, rigid_rects):
@@ -274,6 +272,8 @@ if __name__ == '__main__':
 
     print('Using config:')
     pprint.pprint(cfg)
+    
+    prevent_sleep()
 
     test_data = 'voc_2007_%s' % args.data_type
     step = 'step_%s' % args.step

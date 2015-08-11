@@ -17,6 +17,7 @@ import caffe
 import argparse
 import pprint
 import time, os, sys
+from util import prevent_sleep
 
 def parse_args():
     """
@@ -77,6 +78,8 @@ if __name__ == '__main__':
         print('Waiting for {} to exist...'.format(args.caffemodel))
         time.sleep(10)
 
+    prevent_sleep()
+    
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)

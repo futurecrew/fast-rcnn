@@ -1,8 +1,9 @@
 function res = voc_eval(path, comp_id, test_set, output_dir, rm_res)
 
+% DJDJ
 %{
 path = 'E:/data/VOCdevkit2';
-comp_id = 'comp4-2644';
+comp_id = 'comp4-6060';
 test_set = 'test';
 output_dir = 'E:\project\fast-rcnn\output\fast_rcnn\voc_2007_test\vgg_cnn_m_1024_fast_rcnn_iter_40000_with_step_1_rpn_top_2300';
 rm_res = 1;
@@ -22,6 +23,16 @@ aps = [res(:).ap]';
 fprintf('%.1f\n', aps * 100);
 fprintf('%.1f\n', mean(aps) * 100);
 fprintf('~~~~~~~~~~~~~~~~~~~~\n');
+
+output_file = sprintf('%s/result.txt', output_dir);
+fileID = fopen(output_file,'w');
+fprintf(fileID, '\n~~~~~~~~~~~~~~~~~~~~\n');
+fprintf(fileID, 'Results:\n');
+fprintf(fileID, '%.1f\n', aps * 100);
+fprintf(fileID, '%.1f\n', mean(aps) * 100);
+fprintf(fileID, '~~~~~~~~~~~~~~~~~~~~\n');
+fclose(fileID);
+
 
 input('enter to continue'); 
 
