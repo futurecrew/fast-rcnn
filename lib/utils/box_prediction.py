@@ -157,5 +157,9 @@ def get_predicted_boxes(cls_pred, box_deltas,
     pred_boxes = pred_boxes[keep, :]
     pred_boxes = pred_boxes[:max_cand_after_nms]
     
+    keep = np.array(keep)
+    sorted_scores = sorted_scores[keep]
+    sorted_scores = sorted_scores[:max_cand_after_nms]
+    
     return rigid_rects, pred_boxes, sorted_scores
         

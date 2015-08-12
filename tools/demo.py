@@ -156,7 +156,7 @@ if __name__ == '__main__':
                             'rpn', 'test_mixed.prototxt')
     caffemodel_mixed_frcnn = os.path.join(cfg.ROOT_DIR, 'output', 'fast_rcnn',
                               'voc_2007_trainval_with_rpn', 
-                              'vgg_cnn_m_1024_fast_rcnn_step4_with_rpn_iter_80000.caffemodel')
+                              'vgg_cnn_m_1024_fast_rcnn_step4_with_rpn_iter_40000.caffemodel')
     caffemodel_mixed_rpn = os.path.join(cfg.ROOT_DIR, 'output', 'faster_rcnn',
                               'voc_2007_trainval', 
                               'vgg_cnn_m_1024_rpn_step3_iter_80000.caffemodel')
@@ -180,20 +180,20 @@ if __name__ == '__main__':
 
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/000004.jpg'
-    demo(net, '000004', ('car',), mixed=False)
-    plt.show()
+    
+    #demo(net, '000004', ('car',), mixed=False)
+    #plt.show()
 
     demo(net_mixed, '000004', ('car',), mixed=True)
     plt.show()
 
-    """
+    
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/001551.jpg'
-    demo(net, '001551', ('sofa', 'tvmonitor'), mixed=False)
-    plt.show()
+    #demo(net, '001551', ('sofa', 'tvmonitor'), mixed=False)
+    #plt.show()
 
     demo(net_mixed, '001551', ('sofa', 'tvmonitor'), mixed=True)
     plt.show()
-    """
     
     

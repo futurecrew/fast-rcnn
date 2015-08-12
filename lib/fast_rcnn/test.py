@@ -231,7 +231,7 @@ def im_detect_mixed(net, im):
             background as object category 0)
         boxes (ndarray): R x (4*K) array of predicted bounding boxes
     """
-    blobs, unused_im_scale_factors = _get_blobs(im, None)
+    blobs, im_scale_factors = _get_blobs(im, None)
 
     # reshape network inputs
     net.blobs['data'].reshape(*(blobs['data'].shape))
@@ -244,6 +244,7 @@ def im_detect_mixed(net, im):
         # use softmax estimated probabilities
         scores = blobs_out['cls_prob']
     boxes = net.blobs['rois'].data[:, 1:]
+    boxes = boxes / im_scale_factors[0]
     if cfg.TEST.BBOX_REG:
         # Apply bounding-box regression deltas
         box_deltas = blobs_out['bbox_pred']

@@ -23,7 +23,7 @@ class RoIProposalLayer(caffe.Layer):
 
     def forward(self, bottom, top):
         self.NMS_THRESH = 0.7
-        self.MAX_CAND_BEFORE_NMS = 10000
+        self.MAX_CAND_BEFORE_NMS = 3000
         self.MAX_CAND_AFTER_NMS = 300        
 
         input_img_data = bottom[0].data

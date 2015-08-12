@@ -24,7 +24,7 @@ fprintf('%.1f\n', aps * 100);
 fprintf('%.1f\n', mean(aps) * 100);
 fprintf('~~~~~~~~~~~~~~~~~~~~\n');
 
-output_file = sprintf('%s/result.txt', output_dir);
+output_file = sprintf('%s/result_%s.txt', output_dir, comp_id);
 fileID = fopen(output_file,'w');
 fprintf(fileID, '\n~~~~~~~~~~~~~~~~~~~~\n');
 fprintf(fileID, 'Results:\n');
