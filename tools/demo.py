@@ -88,10 +88,6 @@ def demo(net, image_name, classes, mixed=False):
         obj_proposals = sio.loadmat(box_file)['boxes']
     
     
-    
-    # DJDJ
-    #obj_proposals = obj_proposals[:300, ]
-
     # Load the demo image
     im_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo', image_name + '.jpg')
     im = cv2.imread(im_file)

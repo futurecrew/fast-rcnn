@@ -14,7 +14,8 @@ set day=%date:~8,2%
 if "%day:~0,1%" == " " set day=0%day:~1,1%
 
 set step=%1
+set model=%2
 set log_file=experiments\logs\faster_rcnn\log_%year%%month%%day%_%hour%%min%%secs%.txt
 
-run0.bat %step% | tee -a %log_file%
+run0.bat %step% %model% | tee -a %log_file%
 

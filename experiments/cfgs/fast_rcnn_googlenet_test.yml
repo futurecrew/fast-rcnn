@@ -1,0 +1,5 @@
+EXP_DIR: fast_rcnn
+MAX_PROPOSAL_NO: 2000
+
+TEST:
+  MAX_SIZE: 600

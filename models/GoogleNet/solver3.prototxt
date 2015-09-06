@@ -1,9 +1,8 @@
-train_net: "models/VGG16/rpn/train.prototxt"
-#base_lr: 0.001
+net: "models/GoogleNet/train.prototxt"
 base_lr: 0.0001
 lr_policy: "step"
-gamma: 0.01
-stepsize: 60000
+gamma: 0.1
+stepsize: 30000
 display: 20
 average_loss: 100
 # iter_size: 1
@@ -13,5 +12,5 @@ weight_decay: 0.0005
 # function
 snapshot: 0
 # We still use the snapshot prefix, though
-snapshot_prefix: "vgg16_rpn"
+snapshot_prefix: "googlenet3_fast_rcnn"
 #debug_info: true

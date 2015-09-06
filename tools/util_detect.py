@@ -32,7 +32,7 @@ def display_prediction(image_path, ground_rects, pred_result_list):
             proc.kill()
 
 def area(left, top, right, bottom):
-    return (right - left) * (bottom - top)
+    return int(right - left) * int(bottom - top)
 
 def iou(rect1_left, rect1_top, rect1_right, rect1_bottom, 
         rect2_left, rect2_top, rect2_right, rect2_bottom):

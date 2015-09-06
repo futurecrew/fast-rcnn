@@ -105,6 +105,16 @@ if __name__ == '__main__':
         model_name = 'VGG16'
     elif 'VGG_CNN_M_1024' in args.pretrained_model.upper():
         model_name = 'VGG_CNN_M_1024'
+    elif 'GOOGLENET2' in args.pretrained_model.upper():
+        model_name = 'GOOGLENET2'
+    elif 'GOOGLENET3' in args.pretrained_model.upper():
+        model_name = 'GOOGLENET3'
+    elif 'GOOGLENET4' in args.pretrained_model.upper():
+        model_name = 'GOOGLENET4'
+    elif 'GOOGLENET5' in args.pretrained_model.upper():
+        model_name = 'GOOGLENET5'
+    elif 'GOOGLENET' in args.pretrained_model.upper():
+        model_name = 'GOOGLENET'
     else:
         raise Exception("This model is not supported. %s" % args.pretrained_model)
     

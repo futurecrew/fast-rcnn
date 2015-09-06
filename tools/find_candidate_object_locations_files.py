@@ -173,6 +173,7 @@ class Detector(object):
         
             # Rescale boxes back according to the original image size
             pred_boxes = pred_boxes / im_scale_factors[0]        
+            rigid_rects = rigid_rects / im_scale_factors[0]        
             gt_boxes = gtdb[no-1]['boxes']
             
             #gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
@@ -231,6 +232,9 @@ def parse_args():
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
+    parser.add_argument('--prototxt', dest='prototxt',
+                        help='prototxt to use',
+                        default=None, type=str)
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
@@ -253,10 +257,10 @@ def parse_args():
 
 if __name__ == '__main__':
     voc_base_folder = 'E:/data/VOCdevkit2/VOC2007/'
-    prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
-
+    
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
+    #prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
 
     iters = 80000
     
@@ -279,6 +283,7 @@ if __name__ == '__main__':
     step = 'step_%s' % args.step
     caffemodel = args.pretrained_model
     MAX_CAND_AFTER_NMS = args.max_output
+    prototxt = args.prototxt
 
     data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % args.data_type
     gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
