@@ -2,12 +2,14 @@ import shutil
 from os import listdir
 from os.path import isfile
 
-dir = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_train_all_data'
-dest = dir
+src_dir = 'E:/data/ilsvrc14/ILSVRC2014_DET_bbox_train'
+dest = src_dir + '/ILSVRC2014_DET_bbox_train_all_data'
 
-for f in listdir(dir):
-    full_path = dir + '/' + f
+for f in listdir(src_dir):
+    full_path = src_dir + '/' + f
     if isfile(full_path):
+        continue
+    elif full_path == dest:
         continue
     
     #shutil.move(full_path + '/.', dest)

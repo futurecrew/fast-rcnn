@@ -10,6 +10,7 @@
 import numpy as np
 from fast_rcnn.config import cfg
 import utils.cython_bbox
+import warnings
 
 import cv2
 from utils.cython_bbox import bbox_overlaps
@@ -59,6 +60,18 @@ def prepare_roidb_rpn(imdb):
     
     for i in xrange(len(imdb.image_index)):
         image_path = imdb.image_path_at(i)
+        
+        # DJDJ
+        #if i < 6100:
+        #    continue
+        
+        # DJDJ
+        #if i == 100:
+        #    del roidb[100:]
+        #    break
+        
+        #print 'i : %s' % i
+        
         roidb[i]['image'] = image_path
         gt_boxes = roidb[i]['boxes']
         gt_classes = roidb[i]['gt_classes']
@@ -84,7 +97,8 @@ def prepare_roidb_rpn(imdb):
 
         rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
         gt_rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
-        boxes = np.zeros((9, 4), dtype=np.int32)
+        #boxes = np.zeros((9, 4), dtype=np.int32)
+        boxes = np.zeros((9 * conv_height * conv_width, 4), dtype=np.int32)
         
         gt_no = len(gt_boxes)
         max_of_maxes = np.zeros((gt_no))
@@ -99,13 +113,13 @@ def prepare_roidb_rpn(imdb):
         if i % 100 == 0:
             print 'processing image %s' % i
         
-        for center_y in xrange(0, conv_height):
-            for center_x in xrange(0, conv_width):
-                #print 'processing [%s, %s]' % (center_y, center_x)
+        anchor_i = -1
+        boxes.fill(-1)
+        for anchor_w, anchor_h in anchors:
+            for center_y in xrange(0, conv_height):
+                for center_x in xrange(0, conv_width):
+                    #print 'processing [%s, %s]' % (center_y, center_x)
 
-                anchor_i = -1
-                boxes.fill(-1)
-                for anchor_w, anchor_h in anchors:
                     x1 = center_x * scale_width - anchor_w / 2
                     y1 = center_y * scale_height - anchor_h / 2
                     x2 = x1 + anchor_w
@@ -119,52 +133,61 @@ def prepare_roidb_rpn(imdb):
                     boxes[anchor_i, :] = x1, y1, x2, y2
                     
                     #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
-                
-                gt_overlaps = bbox_overlaps(boxes.astype(np.float),
-                                            resized_gt_boxes.astype(np.float))
-                argmaxes = gt_overlaps.argmax(axis=1)
-                maxes = gt_overlaps.max(axis=1)
-                
-                # For positive train data
-                I = np.where(maxes > cfg.TRAIN.FG_THRESH)[0]
-                
-                if len(I) > 0:
-                    # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
-                    base_index = I * conv_height * conv_width + center_y * conv_width + center_x
-                    labels[base_index] = gt_classes[argmaxes[I]]
-                    gt_indexes[base_index] = argmaxes[I]
-                    rois[base_index] = boxes[I]
+        
+        gt_overlaps = bbox_overlaps(boxes.astype(np.float),
+                                    resized_gt_boxes.astype(np.float))
+        argmaxes = gt_overlaps.argmax(axis=1)
+        maxes = gt_overlaps.max(axis=1)
+        
+        # For positive train data
+        I = np.where(maxes > cfg.TRAIN.FG_THRESH)[0]
+        
+        if len(I) > 0:
+            """
+            box_index = I % 9
+            center_y_index = I / (9 * conv_width) 
+            center_x_index = I / 9 % conv_height
+            
+            # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
+            base_index = box_index * conv_height * conv_width + center_y_index * conv_width + center_x_index
+            """
+            
+            labels[I] = gt_classes[argmaxes[I]]
+            gt_indexes[I] = argmaxes[I]
+            rois[I] = boxes[I]
 
-                # For negative train data
-                I = np.where(maxes < cfg.TRAIN.BG_THRESH_HI)[0]
-                
-                if len(I) > 0:
-                    # set label to 0 when a box of overlapping area if bigger than FG_THRESH 
-                    base_index = I * conv_height * conv_width + center_y * conv_width + center_x
-                    labels[base_index] = 0
-                    gt_indexes[base_index] = -1
+        # For negative train data
+        I = np.where(maxes < cfg.TRAIN.BG_THRESH_HI)[0]
+        
+        if len(I) > 0:
+            # set label to 0 when a box of overlapping area if bigger than FG_THRESH 
+            #base_index = I * conv_height * conv_width + center_y * conv_width + center_x
+            labels[I] = 0
+            gt_indexes[I] = -1
 
 
-                # Check max overlapping anchor
-                argmaxes = gt_overlaps.argmax(axis=0)
-                maxes = gt_overlaps.max(axis=0)
-                
-                for m in range(len(gt_boxes)):
-                    if maxes[m] > max_of_maxes[m]:
-                        max_of_maxes[m] = maxes[m]
-                        max_ys[m] = center_y
-                        max_xs[m] = center_x
-                        max_classes[m] = gt_classes[m]
-                        max_anchors[m] = argmaxes[m]
-                        max_boxes[m] = boxes[max_anchors[m]].copy()
-
-                
         # set label to 1 of the anchor which has the biggest overlapping area among all the anchors 
+
+        # Check max overlapping anchor
+        argmaxes = gt_overlaps.argmax(axis=0)
+        maxes = gt_overlaps.max(axis=0)
+        
+        """
         for m in range(len(gt_boxes)):
-            base_index = max_anchors[m] * conv_height * conv_width + max_ys[m] * conv_width + max_xs[m]
-            labels[base_index] = max_classes[m]
-            gt_indexes[base_index] = m
-            rois[base_index] = max_boxes[m]
+            if maxes[m] > max_of_maxes[m]:
+                max_of_maxes[m] = maxes[m]
+                max_ys[m] = center_y
+                max_xs[m] = center_x
+                max_classes[m] = gt_classes[m]
+                max_anchors[m] = argmaxes[m]
+                max_boxes[m] = boxes[max_anchors[m]].copy()
+        """
+        
+        for m in range(len(gt_boxes)):
+            #base_index = max_anchors[m] * conv_height * conv_width + max_ys[m] * conv_width + max_xs[m]
+            labels[argmaxes[m]] = gt_classes[m]
+            gt_indexes[argmaxes[m]] = m
+            rois[argmaxes[m]] = boxes[argmaxes[m]]
         
         bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
         
@@ -367,17 +390,28 @@ def _compute_targets_rpn(rois, labels, gt_indexes, gt_boxes):
     print 'gt ctr_x - ex ctr_x : %s' % (gt_ctr_x_temp - roi_ctr_x_temp)
     print 'gt width / ex width : %s' % (gt_width_temp / roi_width_temp)
     """
-
-    if cfg.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET:
-        targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
-        targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
-        targets_dw = np.log(gt_widths / ex_widths)
-        targets_dh = np.log(gt_heights / ex_heights)
-    else:
-        targets_dx = gt_ctr_x - ex_ctr_x
-        targets_dy = gt_ctr_y - ex_ctr_y
-        targets_dw = gt_widths / ex_widths
-        targets_dh = gt_heights / ex_heights
+    with warnings.catch_warnings():
+        warnings.filterwarnings('error')
+        try:
+            if cfg.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET:
+                targets_dx = (gt_ctr_x - ex_ctr_x) / ex_widths
+                targets_dy = (gt_ctr_y - ex_ctr_y) / ex_heights
+                targets_dw = np.log(gt_widths / ex_widths)
+                targets_dh = np.log(gt_heights / ex_heights)
+            else:
+                targets_dx = gt_ctr_x - ex_ctr_x
+                targets_dy = gt_ctr_y - ex_ctr_y
+                targets_dw = gt_widths / ex_widths
+                targets_dh = gt_heights / ex_heights
+        except Warning:
+            # DJDJ
+            targets_dx = (gt_ctr_x - ex_ctr_x) / 50
+            targets_dy = (gt_ctr_y - ex_ctr_y) / 50
+            targets_dw = np.log(gt_widths / 50)
+            targets_dh = np.log(gt_heights / 50)
+            
+            print'here'
+            print '%.10f' % ex_widths
         
     targets = np.zeros((rois.shape[0], 5), dtype=np.float32)
     targets[ex_inds, 0] = gt_lables

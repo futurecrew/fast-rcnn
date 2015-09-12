@@ -12,7 +12,6 @@ from caffe.proto import caffe_pb2
 from util_detect import iou
 import matplotlib.pyplot as plt
 import caffe
-from labels import read_label_file
 from fast_rcnn.test import _get_image_blob
 from utils.model import last_conv_size
 from fast_rcnn.config import cfg, cfg_from_file, get_output_dir

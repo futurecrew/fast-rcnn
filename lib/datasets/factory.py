@@ -10,6 +10,7 @@
 __sets = {}
 
 import datasets.pascal_voc
+import datasets.imagenet
 import numpy as np
 
 def _selective_search_IJCV_top_k(split, year, top_k):
@@ -37,6 +38,12 @@ def _init_imdb(model_to_use, proposal, proposal_file):
                 name = 'voc_{}_{}_top_{:d}'.format(year, split, top_k)
                 __sets[name] = (lambda split=split, year=year, top_k=top_k:
                         _selective_search_IJCV_top_k(split, year, top_k))
+                
+    for split in ['train']:
+        name = 'imagenet_{}'.format(split)
+        __sets[name] = (lambda split=split:
+                datasets.imagenet(split, model_to_use, proposal, proposal_file))
+            
 
 def get_imdb(name, model_to_use='frcnn', proposal='ss', proposal_file=''):
     """Get an imdb (image database) by name."""

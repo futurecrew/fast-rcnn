@@ -70,7 +70,6 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-
     args = parse_args()
     
     if args.cfg_file is not None:
@@ -124,7 +123,7 @@ if __name__ == '__main__':
     print 'Loaded dataset `{:s}` for training'.format(imdb.name)
     
     # DJDJ
-    #imdb.rpn_roidb()
+    #imdb.rpn_train_roidb()
     
     roidb = get_training_roidb(imdb, args.model_to_use)
 

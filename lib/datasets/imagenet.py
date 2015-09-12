@@ -23,23 +23,23 @@ from fast_rcnn.config import cfg
 from utils.model import last_conv_size
 
 
-class pascal_voc(datasets.imdb):
-    def __init__(self, image_set, year, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
-        datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
-        self._year = year
+class imagenet(datasets.pascal_voc):
+    def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file=''):
+        datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
-        self._devkit_path = self._get_default_path() if devkit_path is None \
-                            else devkit_path
-        self._data_path = os.path.join(self._devkit_path, 'VOC' + self._year)
-        self._classes = ('__background__', # always index 0
-                         'aeroplane', 'bicycle', 'bird', 'boat',
-                         'bottle', 'bus', 'car', 'cat', 'chair',
-                         'cow', 'diningtable', 'dog', 'horse',
-                         'motorbike', 'person', 'pottedplant',
-                         'sheep', 'sofa', 'train', 'tvmonitor')
+        self._data_path = self._get_default_path()
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
+        class_name_list_file = 'data/imagenet_det.txt'
+        self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
+                                               class_name_list_file)
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
-        self._image_ext = '.jpg'
+        self._image_ext = '.JPEG'
         self._image_index = self._load_image_set_index()
+        self._gt_roidb = None
+        self.gt_roidb()
         
         self.proposal_file = proposal_file
         
@@ -52,53 +52,51 @@ class pascal_voc(datasets.imdb):
             elif proposal == 'ss':
                 self._roidb_handler = self.selective_search_roidb
 
-        # PASCAL specific config options
         self.config = {'cleanup'  : True,
                        'use_salt' : True,
                        'top_k'    : 2000}
 
-        assert os.path.exists(self._devkit_path), \
-                'VOCdevkit path does not exist: {}'.format(self._devkit_path)
         assert os.path.exists(self._data_path), \
                 'Path does not exist: {}'.format(self._data_path)
 
+    def _load_class_info(self, meta_det_file, class_name_list_file):
+        det_meta = sio.loadmat(meta_det_file)
+        class_names = []
+        wnids = []
+        
+        class_names.append('__background__')    # always index 0
+        wnids.append('__background__')
+        
+        with open(class_name_list_file) as f:
+            for class_name in f.readlines():
+                class_names.append(class_name.rstrip())
+                
+        for data in det_meta['synsets'][0]:
+            wnid = data[1][0].encode('ascii', 'ignore')
+            class_name = data[2][0].encode('ascii', 'ignore')
+            if class_name in class_names:
+                wnids.append(wnid)
+
+        return class_names, wnids
+        
     def image_path_at(self, i):
         """
         Return the absolute path to image i in the image sequence.
         """
-        return self.image_path_from_index(self._image_index[i])
-
-    def image_path_from_index(self, index):
-        """
-        Construct an image path from the image's "index" identifier.
-        """
-        image_path = os.path.join(self._data_path, 'JPEGImages',
-                                  index + self._image_ext)
+        image_path = os.path.join(self._image_path,
+                                  self._image_index[i] + self._image_ext)
         assert os.path.exists(image_path), \
                 'Path does not exist: {}'.format(image_path)
         return image_path
-
+    
     def _load_image_set_index(self):
-        """
-        Load the indexes listed in this dataset's image set file.
-        """
-        # Example path to image set file:
-        # self._devkit_path + /VOCdevkit2007/VOC2007/ImageSets/Main/val.txt
-        image_set_file = os.path.join(self._data_path, 'ImageSets', 'Main',
-                                      self._image_set + '.txt')
-        assert os.path.exists(image_set_file), \
-                'Path does not exist: {}'.format(image_set_file)
-        with open(image_set_file) as f:
-            image_index = [x.strip() for x in f.readlines()]
+        image_index = []
+        for label_file in os.listdir(self._label_path):
+            image_index.append(label_file[:-4])
         return image_index
 
     def _get_default_path(self):
-        """
-        Return the default path where PASCAL VOC is expected to be installed.
-        """
-        # DJDJ
-        #return os.path.join(datasets.ROOT_DIR, 'data', 'VOCdevkit' + self._year)
-        return os.path.join('E:/data/VOCdevkit2')
+        return os.path.join('E:/data/ilsvrc14')
 
     def gt_roidb(self):
         """
@@ -106,22 +104,44 @@ class pascal_voc(datasets.imdb):
 
         This function loads/saves from/to a cache file to speed up future calls.
         """
+        if self._gt_roidb != None:
+            return self._gt_roidb
+        
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
         
         # DJDJ
-        #if os.path.exists(cache_file):
-        if False:
+        if os.path.exists(cache_file):
+        #if False:
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
+                self._image_index = cPickle.load(fid)
             print '{} gt roidb loaded from {}'.format(self.name, cache_file)
+            
+            self._gt_roidb = roidb
             return roidb
 
-        gt_roidb = [self._load_pascal_annotation(index)
-                    for index in self.image_index]
+        gt_roidb = []
+        zero_label_list = []
+        for i, label_file in enumerate(self._image_index):
+            gt = self._load_imagenet_annotation(label_file + '.xml')
+            if gt == None:
+                zero_label_list.append(i)
+                continue
+            
+            gt_roidb.append(gt)
+            if i % 1000 == 0:
+                print '%s labels read' % i
+                
+        # remove zero label data from train data
+        for i in zero_label_list[::-1]: 
+            del self._image_index[i]
+                                           
         with open(cache_file, 'wb') as fid:
             cPickle.dump(gt_roidb, fid, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(self._image_index, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote gt roidb to {}'.format(cache_file)
 
+        self._gt_roidb = gt_roidb
         return gt_roidb
 
     def selective_search_roidb(self):
@@ -140,12 +160,9 @@ class pascal_voc(datasets.imdb):
             print '{} ss roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
-        if int(self._year) == 2007 or self._image_set != 'test':
-            gt_roidb = self.gt_roidb()
-            ss_roidb = self._load_selective_search_roidb(gt_roidb)
-            roidb = datasets.imdb.merge_roidbs(gt_roidb, ss_roidb)
-        else:
-            roidb = self._load_selective_search_roidb(None)
+        gt_roidb = self.gt_roidb()
+        ss_roidb = self._load_selective_search_roidb(gt_roidb)
+        roidb = datasets.imdb.merge_roidbs(gt_roidb, ss_roidb)
         with open(cache_file, 'wb') as fid:
             cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote ss roidb to {}'.format(cache_file)
@@ -195,7 +212,7 @@ class pascal_voc(datasets.imdb):
     def _load_selective_search_IJCV_roidb(self, gt_roidb):
         IJCV_path = os.path.abspath(os.path.join(self.cache_path, '..',
                                                  'selective_search_IJCV_data',
-                                                 'voc_' + self._year))
+                                                 'imagenet_' + self._year))
         assert os.path.exists(IJCV_path), \
                'Selective search IJCV data not found at: {}'.format(IJCV_path)
 
@@ -213,10 +230,9 @@ class pascal_voc(datasets.imdb):
         Return the database of rpn regions of interest.
         Ground-truth ROIs are also included.
         """
-        if int(self._year) == 2007 or self._image_set != 'test':
-            gt_roidb = self.gt_roidb()
+        gt_roidb = self.gt_roidb()
             
-            roidb = gt_roidb
+        roidb = gt_roidb
 
         return roidb
 
@@ -240,16 +256,13 @@ class pascal_voc(datasets.imdb):
             return roidb
         """
         
-        if int(self._year) == 2007 or self._image_set != 'test':
-            gt_roidb = self.gt_roidb()
-            
-            roidb = gt_roidb
-            
-            rpn_roidb = self._load_rpn_roidb(gt_roidb)
-            roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
-        else:
-            roidb = self._load_rpn_roidb(None)
-            
+        gt_roidb = self.gt_roidb()
+        
+        roidb = gt_roidb
+        
+        rpn_roidb = self._load_rpn_roidb(gt_roidb)
+        roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
+        
         """
         with open(cache_file, 'wb') as fid:
             cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
@@ -266,12 +279,12 @@ class pascal_voc(datasets.imdb):
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
 
-    def _load_pascal_annotation(self, index):
+    def _load_imagenet_annotation(self, label_file):
         """
-        Load image and bounding boxes info from XML file in the PASCAL VOC
+        Load image and bounding boxes info from XML file in the imagenet
         format.
         """
-        filename = os.path.join(self._data_path, 'Annotations', index + '.xml')
+        filename = os.path.join(self._label_path, label_file)
         # print 'Loading: {}'.format(filename)
         def get_data_from_tag(node, tag):
             return node.getElementsByTagName(tag)[0].childNodes[0].data
@@ -286,6 +299,9 @@ class pascal_voc(datasets.imdb):
         gt_classes = np.zeros((num_objs), dtype=np.int32)
         overlaps = np.zeros((num_objs, self.num_classes), dtype=np.float32)
 
+        if len(objs) == 0:
+            return None
+        
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
             # Make pixel indexes 0-based
@@ -306,19 +322,19 @@ class pascal_voc(datasets.imdb):
                 'gt_overlaps' : overlaps,
                 'flipped' : False}
 
-    def _write_voc_results_file(self, all_boxes):
+    def _write_imagenet_results_file(self, all_boxes):
         use_salt = self.config['use_salt']
         comp_id = 'comp4'
         if use_salt:
             comp_id += '-{}'.format(os.getpid())
 
         # VOCdevkit/results/VOC2007/Main/comp4-44503_det_test_aeroplane.txt
-        path = os.path.join(self._devkit_path, 'results', 'VOC' + self._year,
-                            'Main', comp_id + '_')
+        path = os.path.join(self._devkit_path, 'results', 'imagenet',
+                            comp_id + '_')
         for cls_ind, cls in enumerate(self.classes):
             if cls == '__background__':
                 continue
-            print 'Writing {} VOC results file'.format(cls)
+            print 'Writing {} imagenet results file'.format(cls)
             filename = path + 'det_' + self._image_set + '_' + cls + '.txt'
             with open(filename, 'wt') as f:
                 for im_ind, index in enumerate(self.image_index):
@@ -360,7 +376,7 @@ class pascal_voc(datasets.imdb):
 
 
     def evaluate_detections(self, all_boxes, output_dir):
-        comp_id = self._write_voc_results_file(all_boxes)
+        comp_id = self._write_imagenet_results_file(all_boxes)
         self._do_matlab_eval(comp_id, output_dir)
 
     def competition_mode(self, on):
@@ -372,6 +388,6 @@ class pascal_voc(datasets.imdb):
             self.config['cleanup'] = True
 
 if __name__ == '__main__':
-    d = datasets.pascal_voc('trainval', '2007')
+    d = datasets.imagenet('train')
     res = d.roidb
     from IPython import embed; embed()
