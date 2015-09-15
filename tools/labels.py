@@ -174,15 +174,21 @@ def parse_label_files(folder, gt_file_list, output_pickle):
 if __name__ == '__main__':
     match_threshold = 0.5
     
-    """
-    prediction_mat = 'E:/project/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
+
+    prediction_mat = 'E:/project/fast-rcnn/data/selective_search_data/voc_2007_train.mat'
+    gt_file_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/train.txt'
+    gt_output_pickle = 'E:/voc2007_train_labels.pkl'
+
+    #prediction_mat = 'E:/project/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
+    #gt_file_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+    #gt_output_pickle = 'E:/voc2007_trainval_labels.pkl'
+
     gt_folder = 'E:/data/VOCdevkit/VOC2007/Annotations'
-    gt_file_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
-    gt_output_pickle = 'E:/voc2007_trainval_labels.pkl'
     img_folder = 'E:/data/VOCdevkit/VOC2007/JPEGImages'
     img_extension = 'jpg'
-    """
+
     
+    """
     #gt_folder = 'E:/tmp/ILSVRC2013_DET_bbox_train'
     #gt_output_pickle = 'E:/ILSVRC2013_DET_labels.pkl'
 
@@ -192,6 +198,7 @@ if __name__ == '__main__':
     gt_output_pickle = 'E:/ILSVRC2014_DET_labels.pkl'
     img_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_train_all_data'
     img_extension = 'JPEG'
+    """
     
     labels, zero_label = parse_label_files(gt_folder, gt_file_list, gt_output_pickle)
     label_count = {}
@@ -211,17 +218,20 @@ if __name__ == '__main__':
             pred_boxes = prediction['boxes'][0]
         preds = {}
         for image, box in zip(pred_images, pred_boxes):
-            if len(image) == 1:
+            if isinstance(image, np.ndarray):
+                image = image[0]
+            if isinstance(image, np.ndarray):
                 image = image[0]
             if len(box) == 1:
                 box = box[0]
-                
-            image_name = image[0].encode('ascii','ignore')
+
+            image_name = image.encode('ascii','ignore')
+            
             preds[image_name] = box[:, (1, 0, 3, 2)]
         
         total_no_to_find = 0
         total_no_found = 0
-        
+        i = 0
         for key, value in labels.iteritems():
             file_name = key[:-3] + img_extension
             img_file = img_folder + '/' + file_name
@@ -229,6 +239,7 @@ if __name__ == '__main__':
                 print '%s does not exist' % key
                 missing_file_count += 1
             
+            i += 1
             ground_rects = []
             for label in value:
                 label_name, xmin, ymin, xmax, ymax = label
@@ -244,7 +255,7 @@ if __name__ == '__main__':
             total_no_to_find += no_to_find
             total_no_found += no_found
             
-            print '%s out of %s found using %s candidates. %s. total acc=%.3f' % (no_found, no_to_find, 
+            print '[%s] %s out of %s found using %s candidates. %s. total acc=%.3f' % (i, no_found, no_to_find, 
                                                                                   len(pred_rects), file_name, 
                                                                                   (float(total_no_found) / float(total_no_to_find)))
             

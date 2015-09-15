@@ -12,7 +12,7 @@ RoIDataLayer implements a Caffe Python layer.
 
 import caffe
 from fast_rcnn.config import cfg
-from roi_data_layer.minibatch import get_minibatch
+from roi_data_layer.minibatch import get_minibatch, clear_minibatch
 import numpy as np
 import yaml
 from multiprocessing import Process, Queue
@@ -20,7 +20,7 @@ from utils.model import last_conv_size
 
 class RoIDataLayer(caffe.Layer):
     """Fast R-CNN data layer used for training."""
-
+        
     def _shuffle_roidb_inds(self):
         """Randomly permute the training roidb."""
         self._perm = np.random.permutation(np.arange(len(self._roidb)))
@@ -44,13 +44,20 @@ class RoIDataLayer(caffe.Layer):
         if cfg.TRAIN.USE_PREFETCH:
             return self._blob_queue.get()
         else:
-            db_inds = self._get_next_minibatch_inds()
-            minibatch_db = [self._roidb[i] for i in db_inds]
-            return get_minibatch(minibatch_db, self._num_classes)
+            # Clear up the previous labels and bbox_targets to save memory
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB == True and self._cur_minibatch_db != None:
+                clear_minibatch(self._cur_minibatch_db)
 
-    def set_roidb(self, roidb):
+            db_inds = self._get_next_minibatch_inds()
+            self._cur_minibatch_db = [self._roidb[i] for i in db_inds]
+            return get_minibatch(self._cur_minibatch_db, self._num_classes, self._bbox_means, self._bbox_stds)
+
+    def set_roidb(self, roidb, bbox_means, bbox_stds):
         """Set the roidb to be used by this layer during training."""
+        self._cur_minibatch_db = None
         self._roidb = roidb
+        self._bbox_means = bbox_means
+        self._bbox_stds = bbox_stds
         self._shuffle_roidb_inds()
         if cfg.TRAIN.USE_PREFETCH:
             self._blob_queue = Queue(10)

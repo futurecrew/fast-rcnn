@@ -13,8 +13,9 @@ import cv2
 from fast_rcnn.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from utils.model import last_conv_size
+from roi_data_layer.roidb import prepare_one_roidb_rpn, prepare_one_roidb_frcnn
 
-def get_minibatch(roidb, num_classes):
+def get_minibatch(roidb, num_classes, bbox_means, bbox_stds):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -27,9 +28,10 @@ def get_minibatch(roidb, num_classes):
     fg_rois_per_image = np.round(cfg.TRAIN.FG_FRACTION * rois_per_image)
 
     # Get the input image blob, formatted for caffe
-    im_blob, im_scales = _get_image_blob(roidb, random_scale_inds)
+    im_blob, im_scales, processed_ims = _get_image_blob(roidb, random_scale_inds)
     
     if 'model_to_use' in roidb[0] and roidb[0]['model_to_use'] == 'rpn':
+        
         conv_h, scale_h = last_conv_size(im_blob.shape[2], cfg.MODEL_NAME)
         conv_w, scale_w = last_conv_size(im_blob.shape[3], cfg.MODEL_NAME)
         
@@ -40,6 +42,21 @@ def get_minibatch(roidb, num_classes):
         bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
         all_overlaps = []
         for im_i in xrange(num_images):
+            
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB:
+                prepare_one_roidb_rpn(roidb[im_i], 
+                                      processed_ims[im_i].shape[0], 
+                                      processed_ims[im_i].shape[1],
+                                      im_scales[im_i])
+                
+            # Normalize bbox_targets
+            if cfg.TRAIN.NORMALIZE_BBOX:
+                bbox_targets = roidb[im_i]['bbox_targets']
+                cls_inds = np.where(bbox_targets[:, 0] > 0)[0]
+                if cls_inds.size > 0:
+                    bbox_targets[cls_inds, 1:] -= bbox_means[0, :]
+                    bbox_targets[cls_inds, 1:] /= bbox_stds[0, :]
+
             labels, overlaps, im_rois, bbox_targets, bbox_loss \
                 = _sample_rois_rpn(roidb[im_i], fg_rois_per_image, rois_per_image,
                                num_classes, conv_h, conv_w)
@@ -68,6 +85,18 @@ def get_minibatch(roidb, num_classes):
         bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
         # all_overlaps = []
         for im_i in xrange(num_images):
+            
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB:
+                prepare_one_roidb_frcnn(roidb[im_i])
+                
+            # Normalize bbox_targets
+            if cfg.TRAIN.NORMALIZE_BBOX:
+                bbox_targets = roidb[im_i]['bbox_targets']
+                for cls in xrange(1, num_classes):
+                    cls_inds = np.where(bbox_targets[:, 0] == cls)[0]
+                    bbox_targets[cls_inds, 1:] -= bbox_means[cls, :]
+                    bbox_targets[cls_inds, 1:] /= bbox_stds[cls, :]
+
             labels, overlaps, im_rois, bbox_targets, bbox_loss \
                 = _sample_rois(roidb[im_i], fg_rois_per_image, rois_per_image,
                                num_classes)
@@ -97,6 +126,12 @@ def get_minibatch(roidb, num_classes):
 
     return blobs
 
+def clear_minibatch(roidb):
+    num_images = len(roidb)
+    for im_i in xrange(num_images):
+        roidb[im_i]['max_classes'] = None
+        roidb[im_i]['bbox_targets'] = None    
+    
 def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     """Generate a random sample of RoIs comprising foreground and background
     examples.
@@ -365,7 +400,7 @@ def _get_image_blob(roidb, scale_inds):
     # Create a blob to hold the input images
     blob = im_list_to_blob(processed_ims)
 
-    return blob, im_scales
+    return blob, im_scales, processed_ims
 
 def _project_im_rois(im_rois, im_scale_factor):
     """Project image RoIs into the rescaled training image."""

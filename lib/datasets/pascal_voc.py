@@ -109,8 +109,8 @@ class pascal_voc(datasets.imdb):
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
         
         # DJDJ
-        #if os.path.exists(cache_file):
-        if False:
+        if os.path.exists(cache_file):
+        #if False:
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
             print '{} gt roidb loaded from {}'.format(self.name, cache_file)

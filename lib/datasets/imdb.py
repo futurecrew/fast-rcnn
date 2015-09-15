@@ -27,6 +27,8 @@ class imdb(object):
         self._roidb_handler = self.default_roidb
         # Use this dict for storing dataset specific config options
         self.config = {}
+        self._bbox_means = None
+        self._bbox_stds = None
 
     @property
     def name(self):
@@ -51,6 +53,22 @@ class imdb(object):
     @roidb_handler.setter
     def roidb_handler(self, val):
         self._roidb_handler = val
+
+    @property
+    def bbox_means(self):
+        return self._bbox_means
+
+    @bbox_means.setter
+    def bbox_means(self, val):
+        self._bbox_means = val
+
+    @property
+    def bbox_stds(self):
+        return self._bbox_stds
+
+    @bbox_stds.setter
+    def bbox_stds(self, val):
+        self._bbox_stds = val
 
     @property
     def roidb(self):
@@ -102,6 +120,7 @@ class imdb(object):
             oldx2 = boxes[:, 2].copy()
             boxes[:, 0] = widths[i] - oldx2 - 1
             boxes[:, 2] = widths[i] - oldx1 - 1
+            
             assert (boxes[:, 2] >= boxes[:, 0]).all()
             entry = {'boxes' : boxes,
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],

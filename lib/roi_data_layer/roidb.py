@@ -12,223 +12,254 @@ from fast_rcnn.config import cfg
 import utils.cython_bbox
 import warnings
 
+import os
+import sys
+import cPickle
+from scipy import sparse
 import cv2
 from utils.cython_bbox import bbox_overlaps
 from utils.blob import im_scale_after_resize
 from utils.model import last_conv_size
+from utils.memory import total_size
 
-def prepare_roidb(imdb):
+anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
+           [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
+           [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
+
+def prepare_one_roidb_frcnn(roidb):
     """Enrich the imdb's roidb by adding some derived quantities that
     are useful for training. This function precomputes the maximum
     overlap, taken over ground-truth boxes, between each ROI and
     each ground-truth box. The class with maximum overlap is also
     recorded.
     """
-    roidb = imdb.roidb
-    for i in xrange(len(imdb.image_index)):
-        roidb[i]['image'] = imdb.image_path_at(i)
-        # need gt_overlaps as a dense array for argmax
-        gt_overlaps = roidb[i]['gt_overlaps'].toarray()
-        # max overlap with gt over classes (columns)
-        max_overlaps = gt_overlaps.max(axis=1)
-        # gt class that had the max overlap
-        max_classes = gt_overlaps.argmax(axis=1)
-        roidb[i]['max_classes'] = max_classes
-        roidb[i]['max_overlaps'] = max_overlaps
-        
-        # sanity checks
-        # max overlap of 0 => class should be zero (background)
-        zero_inds = np.where(max_overlaps == 0)[0]
-        assert all(max_classes[zero_inds] == 0)
-        # max overlap > 0 => class should not be zero (must be a fg class)
-        nonzero_inds = np.where(max_overlaps > 0)[0]
-        assert all(max_classes[nonzero_inds] != 0)
+    # need gt_overlaps as a dense array for argmax
+    gt_overlaps = roidb['gt_overlaps'].toarray()
+    # max overlap with gt over classes (columns)
+    max_overlaps = gt_overlaps.max(axis=1)
+    # gt class that had the max overlap
+    max_classes = gt_overlaps.argmax(axis=1)
 
-def prepare_roidb_rpn(imdb):
+    rois = roidb['boxes']
+                
+    bbox_targets = _compute_targets(rois, max_overlaps, max_classes)
+    
+    roidb['max_classes'] = max_classes
+    roidb['bbox_targets'] = bbox_targets
+    roidb['max_overlaps'] = max_overlaps
+    
+    # sanity checks
+    # max overlap of 0 => class should be zero (background)
+    zero_inds = np.where(max_overlaps == 0)[0]
+    assert all(max_classes[zero_inds] == 0)
+    # max overlap > 0 => class should not be zero (must be a fg class)
+    nonzero_inds = np.where(max_overlaps > 0)[0]
+    assert all(max_classes[nonzero_inds] != 0)
+
+def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_scale):
+    # DJDJ
+    #if i < 6100:
+    #    continue
+    
+    gt_boxes = roidb['boxes']
+    gt_classes = roidb['gt_classes']
+
+    conv_height, scale_height = last_conv_size(resized_im_height, cfg.MODEL_NAME)
+    conv_width, scale_width = last_conv_size(resized_im_width, cfg.MODEL_NAME)
+    
+    resized_gt_boxes = gt_boxes * resize_scale
+    
+    labels = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
+    labels.fill(-1)
+    
+    # indexes for ground true rectangles
+    gt_indexes = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
+    gt_indexes.fill(-1)
+
+    rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
+    gt_rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
+    boxes = np.zeros((9 * conv_height * conv_width, 4), dtype=np.int32)
+    
+    gt_no = len(gt_boxes)
+    max_of_maxes = np.zeros((gt_no))
+    max_anchors = np.zeros((gt_no))
+    max_ys = np.zeros((gt_no))
+    max_xs = np.zeros((gt_no))
+    max_labels = np.zeros((gt_no))
+    max_classes = np.zeros((gt_no))
+    max_boxes = np.zeros((gt_no, 4))
+
+    anchor_i = -1
+    boxes.fill(-1)
+    for anchor_w, anchor_h in anchors:
+        for center_y in xrange(0, conv_height):
+            for center_x in xrange(0, conv_width):
+                #print 'processing [%s, %s]' % (center_y, center_x)
+
+                x1 = center_x * scale_width - anchor_w / 2
+                y1 = center_y * scale_height - anchor_h / 2
+                x2 = x1 + anchor_w
+                y2 = y1 + anchor_h
+                
+                anchor_i += 1
+                
+                if x1 < 0 or y1 < 0 or x2 > resized_im_width or y2 > resized_im_height:
+                    continue
+                
+                boxes[anchor_i, :] = x1, y1, x2, y2
+                
+                #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
+    
+    gt_overlaps = bbox_overlaps(boxes.astype(np.float),
+                                resized_gt_boxes.astype(np.float))
+    argmaxes = gt_overlaps.argmax(axis=1)
+    maxes = gt_overlaps.max(axis=1)
+    
+    # For positive train data
+    I = np.where(maxes > cfg.TRAIN.FG_THRESH)[0]
+    
+    if len(I) > 0:
+        labels[I] = gt_classes[argmaxes[I]]
+        gt_indexes[I] = argmaxes[I]
+        rois[I] = boxes[I]
+
+    # For negative train data
+    I = np.where(maxes < cfg.TRAIN.BG_THRESH_HI)[0]
+    
+    if len(I) > 0:
+        # set label to 0 when a box of overlapping area if bigger than FG_THRESH 
+        labels[I] = 0
+        gt_indexes[I] = -1
+
+
+    # set label to 1 of the anchor which has the biggest overlapping area among all the anchors 
+
+    # Check max overlapping anchor
+    argmaxes = gt_overlaps.argmax(axis=0)
+    maxes = gt_overlaps.max(axis=0)
+    
+    for m in range(len(gt_boxes)):
+        labels[argmaxes[m]] = gt_classes[m]
+        gt_indexes[argmaxes[m]] = m
+        rois[argmaxes[m]] = boxes[argmaxes[m]]
+    
+    bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
+    
+    # convert all the positive data labels to 1 and all the negative 
+    pos_index = np.where(labels > 0)[0]
+    labels[pos_index] = 1
+    
+    #print 'total %s boxes are generated.' % len(box_list)        
+    # need gt_overlaps as a dense array for argmax
+    #gt_overlaps = roidb['gt_overlaps'].toarray()
+    # max overlap with gt over classes (columns)
+    #max_overlaps = gt_overlaps.max(axis=1)
+    # gt class that had the max overlap
+    #max_classes = gt_overlaps.argmax(axis=1)
+    
+    roidb['max_classes'] = labels
+    roidb['bbox_targets'] = bbox_targets
+    roidb['resized_gt_boxes'] = resized_gt_boxes
+    roidb['conv_width'] = conv_width
+    roidb['conv_height'] = conv_height
+    roidb['conv_scale_width'] = scale_width
+    roidb['conv_scale_height'] = scale_height
+
+    # sanity checks
+    # max overlap of 0 => class should be zero (background)
+    #zero_inds = np.where(max_overlaps == 0)[0]
+    #assert all(max_classes[zero_inds] == 0)
+    # max overlap > 0 => class should not be zero (must be a fg class)
+    #nonzero_inds = np.where(max_overlaps > 0)[0]
+    #assert all(max_classes[nonzero_inds] != 0)    
+
+def prepare_roidb(imdb, model_to_use):
     """Enrich the imdb's roidb by adding some derived quantities that
     are useful for training. This function precomputes the maximum
     overlap, taken over ground-truth boxes, between each ROI and
     each ground-truth box. The class with maximum overlap is also
     recorded.
     """
-    roidb = imdb.roidb
 
-    anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
-               [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
-               [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
-    
-    
+    cache_file = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_bbox_means.pkl')
+
+    roidb = imdb.roidb    
+
+    # Try to read the saved mean file
+    if os.path.exists(cache_file):
+        with open(cache_file, 'rb') as fid:
+            imdb.bbox_means = cPickle.load(fid)
+            imdb.bbox_stds = cPickle.load(fid)
+        print '{} bbox mean file is loaded from {}'.format(imdb.name, cache_file)
+        should_calculate_bbox_means = False
+    else:
+        should_calculate_bbox_means = True
+
+    num_classes = imdb.num_classes
+
+    if model_to_use == 'rpn':
+        bbox_class_counts = 0
+        bbox_sums = np.zeros((1, 4))
+        bbox_squared_sums = np.zeros((1, 4))
+    elif model_to_use == 'frcnn':
+        bbox_class_counts = np.zeros((num_classes, 1)) + cfg.EPS
+        bbox_sums = np.zeros((num_classes, 4))
+        bbox_squared_sums = np.zeros((num_classes, 4))
+
     for i in xrange(len(imdb.image_index)):
         image_path = imdb.image_path_at(i)
-        
-        # DJDJ
-        #if i < 6100:
-        #    continue
-        
-        # DJDJ
-        #if i == 100:
-        #    del roidb[100:]
-        #    break
-        
-        #print 'i : %s' % i
-        
         roidb[i]['image'] = image_path
-        gt_boxes = roidb[i]['boxes']
-        gt_classes = roidb[i]['gt_classes']
+        roidb[i]['model_to_use'] = model_to_use    
+        
+        if cfg.TRAIN.LAZY_PREPARING_ROIDB == False or should_calculate_bbox_means == True:
+            im = cv2.imread(image_path)
+            resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)            
+            resized_im_height = int(im.shape[0] * resize_scale)
+            resized_im_width = int(im.shape[1] * resize_scale)
     
-        im = cv2.imread(image_path)
-        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)
-        
-        # Generate anchors based on the resized image
-        im_height = int(im.shape[0] * resize_scale)
-        im_width = int(im.shape[1] * resize_scale)
-        
-        conv_height, scale_height = last_conv_size(im_height, cfg.MODEL_NAME)
-        conv_width, scale_width = last_conv_size(im_width, cfg.MODEL_NAME)
-        
-        resized_gt_boxes = gt_boxes * resize_scale
-        
-        labels = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
-        labels.fill(-1)
-        
-        # indexes for ground true rectangles
-        gt_indexes = np.zeros((9 * conv_height * conv_width), dtype=np.int16)
-        gt_indexes.fill(-1)
+            if model_to_use == 'rpn':
+                prepare_one_roidb_rpn(roidb[i], resized_im_height, resized_im_width, resize_scale)
 
-        rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
-        gt_rois = np.zeros((9 * conv_height * conv_width, 4), dtype=np.float16)
-        #boxes = np.zeros((9, 4), dtype=np.int32)
-        boxes = np.zeros((9 * conv_height * conv_width, 4), dtype=np.int32)
-        
-        gt_no = len(gt_boxes)
-        max_of_maxes = np.zeros((gt_no))
-        max_anchors = np.zeros((gt_no))
-        max_ys = np.zeros((gt_no))
-        max_xs = np.zeros((gt_no))
-        max_labels = np.zeros((gt_no))
-        max_classes = np.zeros((gt_no))
-        max_boxes = np.zeros((gt_no, 4))
+                bbox_targets = roidb[i]['bbox_targets']
+                cls_inds = np.where(bbox_targets[:, 0] > 0)[0]
+                if cls_inds.size > 0:
+                    bbox_class_counts += cls_inds.size
+                    bbox_sums[0, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
+                    bbox_squared_sums[0, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
 
-        
-        if i % 100 == 0:
-            print 'processing image %s' % i
-        
-        anchor_i = -1
-        boxes.fill(-1)
-        for anchor_w, anchor_h in anchors:
-            for center_y in xrange(0, conv_height):
-                for center_x in xrange(0, conv_width):
-                    #print 'processing [%s, %s]' % (center_y, center_x)
-
-                    x1 = center_x * scale_width - anchor_w / 2
-                    y1 = center_y * scale_height - anchor_h / 2
-                    x2 = x1 + anchor_w
-                    y2 = y1 + anchor_h
-                    
-                    anchor_i += 1
-                    
-                    if x1 < 0 or y1 < 0 or x2 > im_width or y2 > im_height:
-                        continue
-                    
-                    boxes[anchor_i, :] = x1, y1, x2, y2
-                    
-                    #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
-        
-        gt_overlaps = bbox_overlaps(boxes.astype(np.float),
-                                    resized_gt_boxes.astype(np.float))
-        argmaxes = gt_overlaps.argmax(axis=1)
-        maxes = gt_overlaps.max(axis=1)
-        
-        # For positive train data
-        I = np.where(maxes > cfg.TRAIN.FG_THRESH)[0]
-        
-        if len(I) > 0:
-            """
-            box_index = I % 9
-            center_y_index = I / (9 * conv_width) 
-            center_x_index = I / 9 % conv_height
+            elif model_to_use == 'frcnn':
+                prepare_one_roidb_frcnn(roidb[i])
+                
+                bbox_targets = roidb[i]['bbox_targets']
+                for cls in xrange(1, num_classes):
+                    cls_inds = np.where(bbox_targets[:, 0] == cls)[0]
+                    if cls_inds.size > 0:
+                        bbox_class_counts[cls] += cls_inds.size
+                        bbox_sums[cls, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
+                        bbox_squared_sums[cls, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
             
-            # set label to 1 when a box of overlapping area if bigger than FG_THRESH 
-            base_index = box_index * conv_height * conv_width + center_y_index * conv_width + center_x_index
-            """
+            # Erase memory in case of LAZY_PREPARING_ROIDB not to use memory
+            # max_classes and bbox_targets will be calculated again in minibatch
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
+                roidb[i]['max_classes'] = None
+                roidb[i]['bbox_targets'] = None
+                
+            if i % 100 == 0:
+                print 'processing image %s' % i
+
+    if should_calculate_bbox_means == True:
+        imdb.bbox_means = bbox_sums / bbox_class_counts
+        imdb.bbox_stds = np.sqrt(bbox_squared_sums / bbox_class_counts - imdb.bbox_means ** 2)
+        
+        print 'imdb.bbox_means : %s' % imdb.bbox_means
+        print 'imdb.bbox_stds : %s' % imdb.bbox_stds
+        
+        with open(cache_file, 'wb') as fid:
+            cPickle.dump(imdb.bbox_means, fid, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(imdb.bbox_stds, fid, cPickle.HIGHEST_PROTOCOL)
+        print 'wrote bbox means to {}'.format(cache_file)
+
             
-            labels[I] = gt_classes[argmaxes[I]]
-            gt_indexes[I] = argmaxes[I]
-            rois[I] = boxes[I]
-
-        # For negative train data
-        I = np.where(maxes < cfg.TRAIN.BG_THRESH_HI)[0]
-        
-        if len(I) > 0:
-            # set label to 0 when a box of overlapping area if bigger than FG_THRESH 
-            #base_index = I * conv_height * conv_width + center_y * conv_width + center_x
-            labels[I] = 0
-            gt_indexes[I] = -1
-
-
-        # set label to 1 of the anchor which has the biggest overlapping area among all the anchors 
-
-        # Check max overlapping anchor
-        argmaxes = gt_overlaps.argmax(axis=0)
-        maxes = gt_overlaps.max(axis=0)
-        
-        """
-        for m in range(len(gt_boxes)):
-            if maxes[m] > max_of_maxes[m]:
-                max_of_maxes[m] = maxes[m]
-                max_ys[m] = center_y
-                max_xs[m] = center_x
-                max_classes[m] = gt_classes[m]
-                max_anchors[m] = argmaxes[m]
-                max_boxes[m] = boxes[max_anchors[m]].copy()
-        """
-        
-        for m in range(len(gt_boxes)):
-            #base_index = max_anchors[m] * conv_height * conv_width + max_ys[m] * conv_width + max_xs[m]
-            labels[argmaxes[m]] = gt_classes[m]
-            gt_indexes[argmaxes[m]] = m
-            rois[argmaxes[m]] = boxes[argmaxes[m]]
-        
-        bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
-        
-        # convert all the positive data labels to 1 and all the negative 
-        pos_index = np.where(labels > 0)[0]
-        labels[pos_index] = 1
-        
-        """
-        pos_index = np.where(gt_indexes >= 0)[0]        
-        for iii in pos_index:
-            print 'label : %s' % (labels[iii]) 
-            print 'rois : %s' % (rois[iii])
-            print 'bbox_targets : %s' % (bbox_targets[iii])
-        """
-                    
-        #print 'total %s boxes are generated.' % len(box_list)        
-        # need gt_overlaps as a dense array for argmax
-        #gt_overlaps = roidb[i]['gt_overlaps'].toarray()
-        # max overlap with gt over classes (columns)
-        #max_overlaps = gt_overlaps.max(axis=1)
-        # gt class that had the max overlap
-        #max_classes = gt_overlaps.argmax(axis=1)
-        roidb[i]['max_classes'] = labels
-        roidb[i]['bbox_targets'] = bbox_targets
-        roidb[i]['model_to_use'] = 'rpn'        
-        #roidb[i]['rois'] = rois
-        roidb[i]['resized_gt_boxes'] = resized_gt_boxes
-        roidb[i]['conv_width'] = conv_width
-        roidb[i]['conv_height'] = conv_height
-        roidb[i]['conv_scale_width'] = scale_width
-        roidb[i]['conv_scale_height'] = scale_height
-        
-        # sanity checks
-        # max overlap of 0 => class should be zero (background)
-        #zero_inds = np.where(max_overlaps == 0)[0]
-        #assert all(max_classes[zero_inds] == 0)
-        # max overlap > 0 => class should not be zero (must be a fg class)
-        #nonzero_inds = np.where(max_overlaps > 0)[0]
-        #assert all(max_classes[nonzero_inds] != 0)
-
-
 def add_bbox_regression_targets(roidb, model_to_use):
     """Add information needed to train bounding-box regressors."""
     assert len(roidb) > 0

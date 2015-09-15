@@ -15,7 +15,26 @@ if "%day:~0,1%" == " " set day=0%day:~1,1%
 
 set step=%1
 set model=%2
+set imdb=%3
 set log_file=experiments\logs\faster_rcnn\log_%year%%month%%day%_%hour%%min%%secs%.txt
 
-run0.bat %step% %model% | tee -a %log_file%
+if "%step%" equ "" (
+  call :usage
+  exit /b
+)
+if "%model%" equ "" (
+  call :usage
+  exit /b
+)
+if "%imdb%" equ "" (
+  call :usage
+  exit /b
+)
 
+run0.bat %step% %model% %imdb% | tee -a %log_file%
+
+
+:usage
+echo "run.bat step model imdb"
+echo "e.g. run.bat 1 VGG_CNN_M_1024 voc_2007_trainval"
+echo "e.g. run.bat 0 VGG16 imagenet_train"

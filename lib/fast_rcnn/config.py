@@ -84,6 +84,9 @@ __C.TRAIN.NORMALIZE_BBOX = True
 # Whether to use logistic bbox target or plain bbox target 
 __C.TRAIN.COMPUTE_LOGISTIC_BBOX_TARGET = True
 
+# Prepare ROI DB before training or while training
+__C.TRAIN.LAZY_PREPARING_ROIDB = False
+
 #
 # Testing options
 #

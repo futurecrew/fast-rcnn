@@ -28,10 +28,10 @@ class imagenet(datasets.pascal_voc):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
         self._data_path = self._get_default_path()
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
         class_name_list_file = 'data/imagenet_det.txt'
         self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
                                                class_name_list_file)
@@ -109,9 +109,7 @@ class imagenet(datasets.pascal_voc):
         
         cache_file = os.path.join(self.cache_path, self.name + '_gt_roidb.pkl')
         
-        # DJDJ
         if os.path.exists(cache_file):
-        #if False:
             with open(cache_file, 'rb') as fid:
                 roidb = cPickle.load(fid)
                 self._image_index = cPickle.load(fid)
@@ -240,20 +238,6 @@ class imagenet(datasets.pascal_voc):
         """
         Return the database of rpn regions of interest.
         Ground-truth ROIs are also included.
-
-        This function loads/saves from/to a cache file to speed up future calls.
-        """
-        """
-        cache_file = os.path.join(self.cache_path,
-                                  self.name + '_rpn_roidb.pkl')
-
-        # DJDJ
-        #if os.path.exists(cache_file):
-        if False:
-            with open(cache_file, 'rb') as fid:
-                roidb = cPickle.load(fid)
-            print '{} rpn roidb loaded from {}'.format(self.name, cache_file)
-            return roidb
         """
         
         gt_roidb = self.gt_roidb()
@@ -263,11 +247,6 @@ class imagenet(datasets.pascal_voc):
         rpn_roidb = self._load_rpn_roidb(gt_roidb)
         roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
         
-        """
-        with open(cache_file, 'wb') as fid:
-            cPickle.dump(roidb, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote rpn roidb to {}'.format(cache_file)
-        """
         return roidb
     
     def _load_rpn_roidb(self, gt_roidb):
