@@ -57,10 +57,6 @@ def prepare_one_roidb_frcnn(roidb):
     assert all(max_classes[nonzero_inds] != 0)
 
 def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_scale):
-    # DJDJ
-    #if i < 6100:
-    #    continue
-    
     gt_boxes = roidb['boxes']
     gt_classes = roidb['gt_classes']
 
@@ -181,21 +177,30 @@ def prepare_roidb(imdb, model_to_use):
     recorded.
     """
 
-    cache_file = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_bbox_means.pkl')
-
-    roidb = imdb.roidb    
+    cache_file_bbox_mean = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_bbox_means.pkl')
+    cache_file_roidb = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_roidb.pkl')
 
     # Try to read the saved mean file
-    if os.path.exists(cache_file):
-        with open(cache_file, 'rb') as fid:
+    if os.path.exists(cache_file_bbox_mean):
+        with open(cache_file_bbox_mean, 'rb') as fid:
             imdb.bbox_means = cPickle.load(fid)
             imdb.bbox_stds = cPickle.load(fid)
-        print '{} bbox mean file is loaded from {}'.format(imdb.name, cache_file)
-        should_calculate_bbox_means = False
-    else:
-        should_calculate_bbox_means = True
+
+        print 'imdb.bbox_means : %s' % imdb.bbox_means
+        print 'imdb.bbox_stds : %s' % imdb.bbox_stds
+        
+        print '{} bbox mean file is loaded from {}'.format(imdb.name, cache_file_bbox_mean)
+
+    # Try to read the saved roidb file
+    if os.path.exists(cache_file_roidb):
+        with open(cache_file_roidb, 'rb') as fid:
+            imdb.roidb = cPickle.load(fid)
+        
+        print '{} roidb file is loaded from {}'.format(imdb.name, cache_file_roidb)
+        return
 
     num_classes = imdb.num_classes
+    roidb = imdb.roidb
 
     if model_to_use == 'rpn':
         bbox_class_counts = 0
@@ -207,57 +212,66 @@ def prepare_roidb(imdb, model_to_use):
         bbox_squared_sums = np.zeros((num_classes, 4))
 
     for i in xrange(len(imdb.image_index)):
+        # DJDJ
+        if i < 44300:
+            continue
+            
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
         
-        if cfg.TRAIN.LAZY_PREPARING_ROIDB == False or should_calculate_bbox_means == True:
-            im = cv2.imread(image_path)
-            resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)            
-            resized_im_height = int(im.shape[0] * resize_scale)
-            resized_im_width = int(im.shape[1] * resize_scale)
-    
-            if model_to_use == 'rpn':
-                prepare_one_roidb_rpn(roidb[i], resized_im_height, resized_im_width, resize_scale)
+        print 'image_path : %s' % image_path
+        
+        im = cv2.imread(image_path)
+        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)            
+        resized_im_height = int(im.shape[0] * resize_scale)
+        resized_im_width = int(im.shape[1] * resize_scale)
 
-                bbox_targets = roidb[i]['bbox_targets']
-                cls_inds = np.where(bbox_targets[:, 0] > 0)[0]
-                if cls_inds.size > 0:
-                    bbox_class_counts += cls_inds.size
-                    bbox_sums[0, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
-                    bbox_squared_sums[0, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
+        if model_to_use == 'rpn':
+            prepare_one_roidb_rpn(roidb[i], resized_im_height, resized_im_width, resize_scale)
 
-            elif model_to_use == 'frcnn':
-                prepare_one_roidb_frcnn(roidb[i])
-                
-                bbox_targets = roidb[i]['bbox_targets']
-                for cls in xrange(1, num_classes):
-                    cls_inds = np.where(bbox_targets[:, 0] == cls)[0]
-                    if cls_inds.size > 0:
-                        bbox_class_counts[cls] += cls_inds.size
-                        bbox_sums[cls, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
-                        bbox_squared_sums[cls, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
+            bbox_targets = roidb[i]['bbox_targets']
+            cls_inds = np.where(bbox_targets[:, 0] > 0)[0]
+            if cls_inds.size > 0:
+                bbox_class_counts += cls_inds.size
+                bbox_sums[0, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
+                bbox_squared_sums[0, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
+
+        elif model_to_use == 'frcnn':
+            prepare_one_roidb_frcnn(roidb[i])
             
-            # Erase memory in case of LAZY_PREPARING_ROIDB not to use memory
-            # max_classes and bbox_targets will be calculated again in minibatch
-            if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
-                roidb[i]['max_classes'] = None
-                roidb[i]['bbox_targets'] = None
-                
-            if i % 100 == 0:
-                print 'processing image %s' % i
+            bbox_targets = roidb[i]['bbox_targets']
+            for cls in xrange(1, num_classes):
+                cls_inds = np.where(bbox_targets[:, 0] == cls)[0]
+                if cls_inds.size > 0:
+                    bbox_class_counts[cls] += cls_inds.size
+                    bbox_sums[cls, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
+                    bbox_squared_sums[cls, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
+        
+        # Erase memory in case of LAZY_PREPARING_ROIDB not to use memory
+        # max_classes and bbox_targets will be calculated again in minibatch
+        if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
+            roidb[i]['max_classes'] = None
+            roidb[i]['bbox_targets'] = None
+            
+        if i % 100 == 0:
+            print 'processing image %s' % i
 
-    if should_calculate_bbox_means == True:
-        imdb.bbox_means = bbox_sums / bbox_class_counts
-        imdb.bbox_stds = np.sqrt(bbox_squared_sums / bbox_class_counts - imdb.bbox_means ** 2)
-        
-        print 'imdb.bbox_means : %s' % imdb.bbox_means
-        print 'imdb.bbox_stds : %s' % imdb.bbox_stds
-        
-        with open(cache_file, 'wb') as fid:
-            cPickle.dump(imdb.bbox_means, fid, cPickle.HIGHEST_PROTOCOL)
-            cPickle.dump(imdb.bbox_stds, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote bbox means to {}'.format(cache_file)
+
+    imdb.bbox_means = bbox_sums / bbox_class_counts
+    imdb.bbox_stds = np.sqrt(bbox_squared_sums / bbox_class_counts - imdb.bbox_means ** 2)
+    
+    print 'imdb.bbox_means : %s' % imdb.bbox_means
+    print 'imdb.bbox_stds : %s' % imdb.bbox_stds
+    
+    with open(cache_file_bbox_mean, 'wb') as fid:
+        cPickle.dump(imdb.bbox_means, fid, cPickle.HIGHEST_PROTOCOL)
+        cPickle.dump(imdb.bbox_stds, fid, cPickle.HIGHEST_PROTOCOL)
+    print 'wrote bbox means to {}'.format(cache_file_bbox_mean)
+
+    with open(cache_file_roidb, 'wb') as fid:
+        cPickle.dump(imdb.roidb, fid, cPickle.HIGHEST_PROTOCOL)
+    print 'wrote roidb to {}'.format(cache_file_roidb)
 
             
 def add_bbox_regression_targets(roidb, model_to_use):

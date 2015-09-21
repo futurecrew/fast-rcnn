@@ -28,10 +28,10 @@ class imagenet(datasets.pascal_voc):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
         self._data_path = self._get_default_path()
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
         class_name_list_file = 'data/imagenet_det.txt'
         self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
                                                class_name_list_file)
@@ -283,13 +283,16 @@ class imagenet(datasets.pascal_voc):
         
         # Load object bounding boxes into a data frame.
         for ix, obj in enumerate(objs):
-            # Make pixel indexes 0-based
-            x1 = float(get_data_from_tag(obj, 'xmin')) - 1
-            y1 = float(get_data_from_tag(obj, 'ymin')) - 1
-            x2 = float(get_data_from_tag(obj, 'xmax')) - 1
-            y2 = float(get_data_from_tag(obj, 'ymax')) - 1
+            x1 = float(get_data_from_tag(obj, 'xmin'))
+            y1 = float(get_data_from_tag(obj, 'ymin'))
+            x2 = float(get_data_from_tag(obj, 'xmax'))
+            y2 = float(get_data_from_tag(obj, 'ymax'))
             cls = self._class_to_ind[
                     str(get_data_from_tag(obj, "name")).lower().strip()]
+            
+            if x2 <= x1 or y2 <= y1:
+                continue
+            
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
