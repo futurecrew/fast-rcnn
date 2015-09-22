@@ -113,7 +113,7 @@ class Detector(object):
 
     
     def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
-             caffemodel, gt, data_list, test_data, step):
+             caffemodel, gt, data_list, test_data, model_name, step):
         NMS_THRESH = 0.7
         match_threshold = 0.5
         
@@ -131,7 +131,6 @@ class Detector(object):
         input_data = open(data_list).readlines()
         
         for index, file_name in enumerate(input_data):
-            
             file_name = file_name.replace('\n', '').replace('\r', '')
             
             if len(file_name) == 0:
@@ -215,9 +214,11 @@ class Detector(object):
             box_list_to_save.append(pred_boxes.astype(np.int16))
         
         # Save RPN proposal boxes    
-        proposal_file = os.path.join('data', 'rpn_data',
-                '{:s}_{:s}_rpn_top_{:d}_candidate.pkl'.
-                format(test_data, step, MAX_CAND_AFTER_NMS))
+        proposal_folder  = 'output/rpn_data/' + test_data 
+        proposal_file = proposal_folder + '/' + model_name + '_' + step + '_rpn_top_' + str(MAX_CAND_AFTER_NMS) + '_candidate.pkl'
+
+        if not os.path.exists(proposal_folder):
+            os.makedirs(proposal_folder)
 
         with open(proposal_file, 'wb') as fid:
             cPickle.dump(box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
@@ -231,6 +232,9 @@ def parse_args():
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
+    parser.add_argument('--imdb', dest='imdb_name',
+                        help='dataset to train on',
+                        default='voc_2007_trainval', type=str)
     parser.add_argument('--prototxt', dest='prototxt',
                         help='prototxt to use',
                         default=None, type=str)
@@ -240,6 +244,8 @@ def parse_args():
     parser.add_argument('--data_type', dest='data_type',
                         help='data_type(trainval or test)',
                         default=None, type=str)
+    parser.add_argument('--model_name', dest='model_name',
+                        default='vgg_cnn_m_1024', type=str)
     parser.add_argument('--step', dest='step',
                         help='step(1 or 3)',
                         default=None, type=str)
@@ -278,11 +284,12 @@ if __name__ == '__main__':
     
     prevent_sleep()
 
-    test_data = 'voc_2007_%s' % args.data_type
+    test_data = args.imdb_name
     step = 'step_%s' % args.step
     caffemodel = args.pretrained_model
     MAX_CAND_AFTER_NMS = args.max_output
     prototxt = args.prototxt
+    model_name = args.model_name
 
     data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % args.data_type
     gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
@@ -293,4 +300,4 @@ if __name__ == '__main__':
     
     detector = Detector()
     detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
-                  caffemodel, gt, data_list, test_data, step)
+                  caffemodel, gt, data_list, test_data, model_name, step)
