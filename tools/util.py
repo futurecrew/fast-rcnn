@@ -5,7 +5,7 @@ import time
 import ctypes
 import pylab
 from shutil import copyfile
-import psutil
+#import psutil
 
 ES_CONTINUOUS = 0x80000000
 ES_AWAYMODE_REQUIRED = 0x00000040
@@ -55,7 +55,7 @@ def copy_files(src_folder, dest_folder, file_no_per_folder):
             break
 
     print "Copied %s files from %s to %s." % (copied_file_no, src_folder, dest_folder)
-
+"""
 def wait_previous_python_process():
     # If there is python.exe with more than 1 Gbytes
     # then wait until the process finishes.
@@ -89,7 +89,7 @@ def wait_previous_python_process():
             print 'There is no running python.exe.'
             print 'Now stop waiting.'
             break
-
+"""
 def wait_previous_python_process2():
     message_printed = False
         
