@@ -20,7 +20,6 @@ import numpy as np
 import sys
 import io
 from util import prevent_sleep
-from logger import stdout_redirector, redirect_stdout, stdout_redirected
 import os
 
 def parse_args():

@@ -20,7 +20,6 @@ import cv2
 from utils.cython_bbox import bbox_overlaps
 from utils.blob import im_scale_after_resize
 from utils.model import last_conv_size
-from utils.memory import total_size
 
 anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
            [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
@@ -212,15 +211,9 @@ def prepare_roidb(imdb, model_to_use):
         bbox_squared_sums = np.zeros((num_classes, 4))
 
     for i in xrange(len(imdb.image_index)):
-        # DJDJ
-        if i < 44300:
-            continue
-            
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
-        
-        print 'image_path : %s' % image_path
         
         im = cv2.imread(image_path)
         resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)            
