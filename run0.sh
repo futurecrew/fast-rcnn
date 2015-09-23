@@ -50,19 +50,19 @@ if [ "$step_1" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/rpn/solver.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use rpn --cfg experiments/cfgs/faster_rcnn_lazy.yml --iters $iters_rpn"
   echo $cmd
-  `$cmd`
+  $cmd
   
   echo ""
   echo "----------------------------------------------------------------------------------"
   echo "Step 1 : Generate RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/${model_L}_rpn_iter_${iters_rpn}.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name ${model_L} --step 1"
+  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/${imdb}/${model_L}_rpn_iter_${iters_rpn}.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name ${model_L} --step 1"
   echo $cmd
-  `$cmd`
+  $cmd
   
-  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/${model_L}_rpn_iter_${iters_rpn}.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 1"
+  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/${imdb}/${model_L}_rpn_iter_${iters_rpn}.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 1"
   echo $cmd
-  `$cmd`
+  $cmd
 fi
 
 if [ "$step_2" == "true" ]; then
@@ -70,9 +70,9 @@ if [ "$step_2" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   echo "Step 2 : Train FRCNN based on imagenet pre-trained model with step 1 RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step2.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=data/rpn_data/voc_2007_trainval_step_1_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
+  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step2.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_1_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
   echo $cmd
-  `$cmd`
+  $cmd
 fi
 
 if [ "$step_3" == "true" ]; then
@@ -80,25 +80,25 @@ if [ "$step_3" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   echo "Step 3 : Train RPN based on step 2 FRCNN with step 2 RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/rpn/solver_step3.prototxt --weights output/fast_rcnn_lazy/voc_2007_trainval_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use rpn --cfg experiments/cfgs/faster_rcnn_lazy.yml --iters $iters_rpn"
+  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/rpn/solver_step3.prototxt --weights output/fast_rcnn_lazy/${imdb}_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use rpn --cfg experiments/cfgs/faster_rcnn_lazy.yml --iters $iters_rpn"
    echo $cmd
-  `$cmd`
+  $cmd
   
   echo ""
   echo "----------------------------------------------------------------------------------"
   echo "Step 3 : Generate RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name ${model_L} --step 3"
+  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/${imdb}/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name ${model_L} --step 3"
   echo $cmd
-  `$cmd`
+  $cmd
 
-  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 3"
+  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/${imdb}/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 3"
   echo $cmd
-  `$cmd`
+  $cmd
 
-  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 3  --max_output 300"
+  cmd="tools/find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/${imdb}/${model_L}_rpn_step3_iter_$iters_rpn.caffemodel --prototxt models/$model/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name ${model_L} --step 3  --max_output 300"
   echo $cmd
-  `$cmd`
+  $cmd
 fi
 
 if [ "$step_4" == "true" ]; then
@@ -106,8 +106,8 @@ if [ "$step_4" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   echo "Step 4 : Train FRCNN based on step 2 FRCNN with step 3 RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step4.prototxt --weights output/fast_rcnn_lazy/voc_2007_trainval_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=data/rpn_data/voc_2007_trainval_step_3_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
+  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step4.prototxt --weights output/fast_rcnn_lazy/${imdb}_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_3_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
   echo $cmd
- `$cmd`
+  $cmd
 fi
 
