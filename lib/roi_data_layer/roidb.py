@@ -212,19 +212,20 @@ def prepare_roidb(imdb, model_to_use):
 
     for i in xrange(len(imdb.image_index)):
         # DJDJ
-        #if i < 44300:
+        #if i < 6176:
         #    continue
             
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
         
+        #print 'i : %s' % i
         #print 'image_path : %s' % image_path
         
         im = cv2.imread(image_path)
-        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE)            
-        resized_im_height = int(im.shape[0] * resize_scale)
-        resized_im_width = int(im.shape[1] * resize_scale)
+        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE, cfg.TRAIN.MIN_SIZE)            
+        resized_im_height = round(im.shape[0] * resize_scale)
+        resized_im_width = round(im.shape[1] * resize_scale)
 
         if model_to_use == 'rpn':
             prepare_one_roidb_rpn(roidb[i], resized_im_height, resized_im_width, resize_scale)

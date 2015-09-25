@@ -44,7 +44,7 @@ def prep_im_for_blob(im, pixel_means, target_size, max_size):
 
     return im, im_scale
 
-def im_scale_after_resize(im, target_size, max_size):
+def im_scale_after_resize(im, target_size, max_size, min_size):
     """Get image scale after resize"""
     im_shape = im.shape
     im_size_min = np.min(im_shape[0:2])
@@ -53,5 +53,9 @@ def im_scale_after_resize(im, target_size, max_size):
     # Prevent the biggest axis from being more than MAX_SIZE
     if np.round(im_scale * im_size_max) > max_size:
         im_scale = float(max_size) / float(im_size_max)
+
+    # Prevent the shortest axis from being less than LESS_SIZE
+    if np.round(im_scale * im_size_min) < min_size:
+        im_scale = float(min_size) / float(im_size_min)
 
     return im_scale
