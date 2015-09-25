@@ -1,7 +1,7 @@
 
 print_term = 500
-#file_path = 'E:/project/fast-rcnn/experiments/logs/default_vgg16.txt.2015-04-29_10-43-20'
-file_path = 'E:/project/fast-rcnn/experiments/logs/faster_rcnn/log_googlenet_1_5.txt'
+file_path = 'E:/project/fast-rcnn/experiments/logs/default_vgg_cnn_m_1024.txt.2015-04-29_10-42-14'
+#file_path = 'E:/project/fast-rcnn/experiments/logs/faster_rcnn/log_20150915_220000.txt'
 
 with open(file_path) as f:
     lines = f.readlines()

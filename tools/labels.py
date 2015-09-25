@@ -175,16 +175,17 @@ if __name__ == '__main__':
     match_threshold = 0.5
     
 
-    prediction_mat = 'E:/project/fast-rcnn/data/selective_search_data/voc_2007_train.mat'
-    gt_file_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/train.txt'
-    gt_output_pickle = 'E:/voc2007_train_labels.pkl'
+    #prediction_mat = '/home/nvidia/www/workspace/fast-rcnn/output/ss/ss_output.mat'
+    #gt_file_list = '/home/nvidia/www/data/VOCdevkit/VOC2007/ImageSets/Main/train.txt'
+    #gt_output_pickle = '/home/nvidia/www/voc2007_train_labels.pkl'
 
     #prediction_mat = 'E:/project/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
-    #gt_file_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
-    #gt_output_pickle = 'E:/voc2007_trainval_labels.pkl'
+    prediction_mat = '/home/nvidia/www/workspace/fast-rcnn/output/ss/ss_output.mat'
+    gt_file_list = '/home/nvidia/www/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+    gt_output_pickle = '/home/nvidia/www/voc2007_trainval_labels.pkl'
 
-    gt_folder = 'E:/data/VOCdevkit/VOC2007/Annotations'
-    img_folder = 'E:/data/VOCdevkit/VOC2007/JPEGImages'
+    gt_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/Annotations'
+    img_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/JPEGImages'
     img_extension = 'jpg'
 
     
@@ -231,6 +232,7 @@ if __name__ == '__main__':
         
         total_no_to_find = 0
         total_no_found = 0
+        total_pred_rects = 0
         i = 0
         for key, value in labels.iteritems():
             file_name = key[:-3] + img_extension
@@ -254,13 +256,16 @@ if __name__ == '__main__':
             no_to_find, no_found = check_match(img_file, ground_rects, pred_rects, match_threshold)
             total_no_to_find += no_to_find
             total_no_found += no_found
+            total_pred_rects += len(pred_rects)
             
             print '[%s] %s out of %s found using %s candidates. %s. total acc=%.3f' % (i, no_found, no_to_find, 
                                                                                   len(pred_rects), file_name, 
                                                                                   (float(total_no_found) / float(total_no_to_find)))
             
         print 'file : %s, label : %s, category : %s' % (len(labels), total_label_count, len(label_count))
+        print 'actual found : %s, to_find : %s' % (total_no_found, total_no_to_find)
         print 'accuracy : %.3f' % (float(total_no_found) / float(total_no_to_find))
+        print 'total_pred_rects : %s' % total_pred_rects
         print 'missing_file_count : %s' % missing_file_count
     
     

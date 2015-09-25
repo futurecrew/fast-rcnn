@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from skimage import io
 from PIL import Image, ImageDraw, ImageFont
-import psutil
+#import psutil
 
 def draw_rect(draw, left, top, right, bottom, color, text = None, score = None):    
     draw.line((left, top, left, bottom), fill=color, width=2)
@@ -27,9 +27,11 @@ def display_prediction(image_path, ground_rects, pred_result_list):
     
     base.show()
 
+    """
     for proc in psutil.process_iter():
         if proc.name == "display":
             proc.kill()
+    """
 
 def area(left, top, right, bottom):
     return int(right - left) * int(bottom - top)
