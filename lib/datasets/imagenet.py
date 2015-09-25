@@ -17,7 +17,6 @@ import utils.cython_bbox
 import cPickle
 import subprocess
 import sys
-from utils.blob import im_scale_after_resize
 from fast_rcnn.config import cfg
 
 from utils.model import last_conv_size

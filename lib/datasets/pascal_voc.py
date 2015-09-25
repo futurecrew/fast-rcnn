@@ -17,7 +17,6 @@ import utils.cython_bbox
 import cPickle
 import subprocess
 import sys
-from utils.blob import im_scale_after_resize
 from fast_rcnn.config import cfg
 
 from utils.model import last_conv_size
@@ -159,6 +158,9 @@ class pascal_voc(datasets.imdb):
         assert os.path.exists(filename), \
                'Selective search data not found at: {}'.format(filename)
         raw_data = sio.loadmat(filename)['boxes'].ravel()
+
+        # DJDJ
+        #raw_data = raw_data[:150, ]
 
         box_list = []
         for i in xrange(raw_data.shape[0]):
