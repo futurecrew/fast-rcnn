@@ -24,9 +24,11 @@ from utils.model import last_conv_size
 
 
 class imagenet(datasets.pascal_voc):
-    def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file=''):
+    def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
+        self._devkit_path = self._get_default_path() if devkit_path is None \
+                            else devkit_path
         self._data_path = self._get_default_path()
         self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
         self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
@@ -56,6 +58,8 @@ class imagenet(datasets.pascal_voc):
                        'use_salt' : True,
                        'top_k'    : 2000}
 
+        assert os.path.exists(self._devkit_path), \
+                'Imagenet devkit path does not exist: {}'.format(self._devkit_path)
         assert os.path.exists(self._data_path), \
                 'Path does not exist: {}'.format(self._data_path)
 
@@ -96,7 +100,7 @@ class imagenet(datasets.pascal_voc):
         return image_index
 
     def _get_default_path(self):
-        return os.path.join('E:/data/ilsvrc14')
+        return os.path.join('/home/nvidia/www/data/ilsvrc14')
 
     def gt_roidb(self):
         """
@@ -282,7 +286,8 @@ class imagenet(datasets.pascal_voc):
             return None
         
         # Load object bounding boxes into a data frame.
-        for ix, obj in enumerate(objs):
+        ix = 0
+        for obj in objs:
             x1 = float(get_data_from_tag(obj, 'xmin'))
             y1 = float(get_data_from_tag(obj, 'ymin'))
             x2 = float(get_data_from_tag(obj, 'xmax'))
@@ -291,11 +296,13 @@ class imagenet(datasets.pascal_voc):
                     str(get_data_from_tag(obj, "name")).lower().strip()]
             
             if x2 <= x1 or y2 <= y1:
+                boxes = np.delete(boxes, len(boxes)-1, 0)
                 continue
             
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
+            ix += 1
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
@@ -304,6 +311,7 @@ class imagenet(datasets.pascal_voc):
                 'gt_overlaps' : overlaps,
                 'flipped' : False}
 
+
     def _write_imagenet_results_file(self, all_boxes):
         use_salt = self.config['use_salt']
         comp_id = 'comp4'
@@ -311,37 +319,48 @@ class imagenet(datasets.pascal_voc):
             comp_id += '-{}'.format(os.getpid())
 
         # VOCdevkit/results/VOC2007/Main/comp4-44503_det_test_aeroplane.txt
-        path = os.path.join(self._devkit_path, 'results', 'imagenet',
-                            comp_id + '_')
-        for cls_ind, cls in enumerate(self.classes):
-            if cls == '__background__':
-                continue
-            print 'Writing {} imagenet results file'.format(cls)
-            filename = path + 'det_' + self._image_set + '_' + cls + '.txt'
-            with open(filename, 'wt') as f:
-                for im_ind, index in enumerate(self.image_index):
-                    dets = all_boxes[cls_ind][im_ind]
-                    if dets == []:
+        path = self._devkit_path + '/results'
+        if not os.path.exists(path):
+            os.makedirs(path)
+            
+        print 'Writing imagenet results file'
+        filename = path + comp_id + '_' + 'det_' + self._image_set + '.txt'
+        with open(filename, 'wt') as f:
+            for im_ind, index in enumerate(self.image_index):
+                for cls_ind, cls in enumerate(self.classes):
+                    if cls == '__background__':
                         continue
-                    # the VOCdevkit expects 1-based indices
-                    for k in xrange(dets.shape[0]):
-                        f.write('{:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                                format(index, dets[k, -1],
-                                       dets[k, 0] + 1, dets[k, 1] + 1,
-                                       dets[k, 2] + 1, dets[k, 3] + 1))
+                dets = all_boxes[cls_ind][im_ind]
+                if dets == []:
+                    continue
+                # the VOCdevkit expects 1-based indices
+                for k in xrange(dets.shape[0]):
+                    f.write('{:s} {:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+                            format(index, cls_ind, dets[k, -1],
+                                   dets[k, 0], dets[k, 1],
+                                   dets[k, 2], dets[k, 3]))
         return comp_id
 
     def _do_matlab_eval(self, comp_id, output_dir='output'):
         rm_results = self.config['cleanup']
 
         path = os.path.join(os.path.dirname(__file__),
-                            'VOCdevkit-matlab-wrapper')
+                            'Imagenet-devkit-matlab-wrapper')
+        """
         cmd = 'cd {} && '.format(path)
         cmd += '{:s} -nodisplay -nodesktop '.format(datasets.MATLAB)
         cmd += '-r "dbstop if error; '
         cmd += 'voc_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d}); quit;"' \
                .format(self._devkit_path, comp_id,
                        self._image_set, output_dir, int(rm_results))
+        """
+        cmd = 'cd {} && '.format(path)
+        cmd += '{:s} '.format(datasets.OCTAVE)
+        cmd += '--eval '
+        cmd += 'imagenet_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d})' \
+               .format(self._devkit_path, comp_id,
+                       self._image_set, output_dir, int(rm_results))
+
         print('Running:\n{}'.format(cmd))
         
         status = subprocess.call(cmd, shell=True)
