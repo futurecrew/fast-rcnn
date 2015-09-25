@@ -3,15 +3,36 @@ import time
 import subprocess
 import scipy.io as sio
 import numpy as np
+import threading
+import sys
+import time
 
+class SSThread(threading.Thread):
+     def __init__(self, cmd):
+         super(SSThread, self).__init__()
+         self.cmd = cmd
+
+     def run(self):
+        process = subprocess.Popen(self.cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+        while True:
+            buff = process.stdout.readline()
+            if buff == '' and process.poll() != None: 
+                break
+            sys.stdout.write(buff)
+        process.wait()
+             
 def create_target_file_list(folder, output_list):
     with open(output_list, 'w') as f:
         for file_name in os.listdir(folder):
+            if os.path.isdir(file_name):
+                continue
             index = file_name.find('.')
             f.write(file_name[:index] + '\n')
     print '%s is generated.' % output_list
 
-def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no, ss_exe, ss_path):
+def call_external_ss(img_base_folder, data_list, output_dir, extension, 
+                     multi_no, ss_exe, ss_path, output_file_name):
     file_id = []
     file_name = []
     with open(data_list, 'r') as f:
@@ -20,7 +41,8 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
             file_name.append(one_line.rstrip() + '.' + extension)
     
     a = {}
-    a['data'] = np.array(file_name)
+    #a['data'] = np.array(file_name)
+    a['data'] = file_name
     
     img_list_mat_file = '%s/img_list.mat' % (output_dir)
     sio.savemat(img_list_mat_file, a)
@@ -28,8 +50,8 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
     total_data_no = len(file_name)
     
     # DJDJ
-    total_data_no = 10
-    multi_no = 3
+    #total_data_no = 10
+    #multi_no = 3
     
     chunk_size = total_data_no / multi_no
     if total_data_no % multi_no > 0:
@@ -37,7 +59,7 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
 
     start_idx_list = []
     end_idx_list = []
-        
+    thread_list = []
     for i in range(multi_no):    
         start_idx =  chunk_size * i
         end_idx = min(chunk_size * (i + 1), total_data_no)
@@ -53,9 +75,12 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
                .format(start_idx, end_idx, img_list_mat_file, img_base_folder, output_dir)
         print 'Running [%s] : %s' % ((i+1), cmd)
         
-        status = subprocess.call(cmd, shell=True)
+        #status = subprocess.call(cmd, shell=True)
+        thread = SSThread(cmd)
+        thread.start()
+        thread_list.append(thread)
+
         
-    
     while True:
         all_done = True
         for i, start_idx, end_idx in zip(range(multi_no), start_idx_list, end_idx_list):
@@ -96,7 +121,7 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
     a['images'] = images
     a['boxes'] = boxes
     
-    final_ss_output_file = '%s/ss_output.mat' % (output_dir)
+    final_ss_output_file = '%s/%s' % (output_dir, output_file_name)
     sio.savemat(final_ss_output_file, a)
     
     voc_new = sio.loadmat(final_ss_output_file)
@@ -106,19 +131,29 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension, multi_no
     
     
 if __name__ == '__main__':
-    label_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-    img_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-    ss_path = 'E:/project/SelectiveSearchCodeIJCV'
-    ss_exe = 'matlab.exe'
+    ss_path = '/home/nvidia/www/workspace/SelectiveSearchCodeIJCV'
+    ss_exe = 'matlab'
 
-    output_list = os.getcwd() + '/output/ss/data_list.txt'
+    #label_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/Annotations/'
+    #img_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/JPEGImages/'
+    #output_list = os.getcwd() + '/output/ss/voc_2007_trainval_data_list.txt'
+    #output_file_name = 'ss_voc_2007_trainval_output.mat'
+    #extension = 'jpg'
     
-    #create_target_file_list(label_folder, output_list)
-    
+    label_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+    img_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+    output_list = os.getcwd() + '/output/ss/imagenet_train_data_list.txt'
+    output_file_name = 'ss_imagenet_train_output.mat'
     extension = 'JPEG'
-    multi_no = 3
+    
+    start_time = time.time()
+    
+    create_target_file_list(label_folder, output_list)
+    
+    multi_no = 25
 
     output_dir = os.getcwd() + '/output/ss'
 
-    call_external_ss(img_folder, output_list, output_dir, extension, multi_no, ss_exe, ss_path)
+    call_external_ss(img_folder, output_list, output_dir, extension, multi_no, ss_exe, ss_path, output_file_name)
     
+    print 'total time : %.0fs' % (time.time() - start_time)

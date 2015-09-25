@@ -211,15 +211,15 @@ def prepare_roidb(imdb, model_to_use):
         bbox_squared_sums = np.zeros((num_classes, 4))
 
     for i in xrange(len(imdb.image_index)):
+        
         # DJDJ
-        #if i < 6176:
+        #if i < 329700:
         #    continue
-            
+        
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
         
-        #print 'i : %s' % i
         #print 'image_path : %s' % image_path
         
         im = cv2.imread(image_path)

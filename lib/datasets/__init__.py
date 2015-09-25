@@ -18,7 +18,8 @@ ROOT_DIR = osp.join(osp.dirname(__file__), '..', '..')
 # you could change this file.
 
 #MATLAB = 'matlab'
-MATLAB = 'matlab.exe'
+#MATLAB = 'matlab.exe'
+OCTAVE = 'octave'
 
 # http://stackoverflow.com/questions/377017/test-if-executable-exists-in-python
 def _which(program):
@@ -39,7 +40,9 @@ def _which(program):
 
     return None
 
+"""
 if _which(MATLAB) is None:
     msg = ("MATLAB command '{}' not found. "
            "Please add '{}' to your PATH.").format(MATLAB, MATLAB)
     raise EnvironmentError(msg)
+"""

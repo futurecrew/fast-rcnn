@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 import _init_paths
 import os
 import cv2
@@ -261,7 +263,7 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    voc_base_folder = 'E:/data/VOCdevkit2/VOC2007/'
+    voc_base_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/'
     
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
@@ -292,7 +294,7 @@ if __name__ == '__main__':
     model_name = args.model_name
 
     data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % args.data_type
-    gt = 'E:/project/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
+    gt = '/home/nvidia/www/workspace/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
     
     #cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
 

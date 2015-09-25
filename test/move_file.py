@@ -2,8 +2,8 @@ import shutil
 from os import listdir
 from os.path import isfile
 
-src_dir = 'E:/data/ilsvrc14/ILSVRC2014_DET_bbox_train'
-dest = src_dir + '/ILSVRC2014_DET_bbox_train_all_data'
+src_dir = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data/'
+dest = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data/'
 
 for f in listdir(src_dir):
     full_path = src_dir + '/' + f

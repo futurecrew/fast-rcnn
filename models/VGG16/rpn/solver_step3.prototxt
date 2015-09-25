@@ -1,6 +1,6 @@
 train_net: "models/VGG16/rpn/train_step3.prototxt"
 #base_lr: 0.001
-base_lr: 0.0001
+base_lr: 0.0005
 lr_policy: "step"
 gamma: 0.1
 stepsize: 60000
