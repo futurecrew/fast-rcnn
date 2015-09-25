@@ -282,7 +282,8 @@ class imagenet(datasets.pascal_voc):
             return None
         
         # Load object bounding boxes into a data frame.
-        for ix, obj in enumerate(objs):
+        ix = 0
+        for obj in objs:
             x1 = float(get_data_from_tag(obj, 'xmin'))
             y1 = float(get_data_from_tag(obj, 'ymin'))
             x2 = float(get_data_from_tag(obj, 'xmax'))
@@ -291,11 +292,13 @@ class imagenet(datasets.pascal_voc):
                     str(get_data_from_tag(obj, "name")).lower().strip()]
             
             if x2 <= x1 or y2 <= y1:
+                boxes = np.delete(boxes, len(boxes)-1, 0)
                 continue
             
             boxes[ix, :] = [x1, y1, x2, y2]
             gt_classes[ix] = cls
             overlaps[ix, cls] = 1.0
+            ix += 1
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
 

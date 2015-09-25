@@ -35,6 +35,6 @@ if [ "$gpu" == "" ]; then
   exit 
 fi
 
-bash run0.sh ${step} ${model} ${imdb} ${gpu} 2>&1 | tee -a ${log_file}
+bash run0.sh ${step} ${model} ${imdb} ${gpu} 2>&1 | tee ${log_file}
 
 
