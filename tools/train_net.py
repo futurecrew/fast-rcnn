@@ -42,6 +42,9 @@ def parse_args():
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
+    parser.add_argument('--restore', dest='restore',
+                        help='solverstate file path',
+                        default=None, type=str)
     parser.add_argument('--cfg', dest='cfg_file',
                         help='optional config file',
                         default=None, type=str)
@@ -99,22 +102,27 @@ if __name__ == '__main__':
     proposal = args.proposal
     proposal_file = args.proposal_file
 
-    if 'VGG16' in args.pretrained_model.upper():
+    if args.pretrained_model is not None:
+        model_name = args.pretrained_model.upper()
+    elif args.restore is not None:
+        model_name = args.restore.upper()
+        
+    if 'VGG16' in model_name:
         model_name = 'VGG16'
-    elif 'VGG_CNN_M_1024' in args.pretrained_model.upper():
+    elif 'VGG_CNN_M_1024' in model_name:
         model_name = 'VGG_CNN_M_1024'
-    elif 'GOOGLENET2' in args.pretrained_model.upper():
+    elif 'GOOGLENET2' in model_name:
         model_name = 'GOOGLENET2'
-    elif 'GOOGLENET3' in args.pretrained_model.upper():
+    elif 'GOOGLENET3' in model_name:
         model_name = 'GOOGLENET3'
-    elif 'GOOGLENET4' in args.pretrained_model.upper():
+    elif 'GOOGLENET4' in model_name:
         model_name = 'GOOGLENET4'
-    elif 'GOOGLENET5' in args.pretrained_model.upper():
+    elif 'GOOGLENET5' in model_name:
         model_name = 'GOOGLENET5'
-    elif 'GOOGLENET' in args.pretrained_model.upper():
+    elif 'GOOGLENET' in model_name:
         model_name = 'GOOGLENET'
     else:
-        raise Exception("This model is not supported. %s" % args.pretrained_model)
+        raise Exception("This model is not supported. %s" % model_name)
     
     cfg.MODEL_NAME = model_name
 
@@ -131,6 +139,7 @@ if __name__ == '__main__':
 
     train_net(args.solver, imdb.bbox_means, imdb.bbox_stds, roidb, output_dir,
               pretrained_model=args.pretrained_model,
+              restore=args.restore,
               max_iters=args.max_iters,
               model_to_use=model_to_use,
               proposal=proposal)

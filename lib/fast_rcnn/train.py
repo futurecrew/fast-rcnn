@@ -24,7 +24,7 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
-                 pretrained_model=None, model_to_use='frcnn', proposal='ss'):
+                 pretrained_model=None, restore=None, model_to_use='frcnn', proposal='ss'):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
         if model_to_use == 'frcnn':
@@ -46,7 +46,46 @@ class SolverWrapper(object):
         
         self.solver = caffe.SGDSolver(solver_prototxt)
         
-        if pretrained_model is not None:
+        if restore is not None:
+            print ('Loading solverstate '
+                   'from {:s}').format(restore)
+            self.solver.restore(restore)
+
+            if cfg.TRAIN.BBOX_REG and cfg.TRAIN.NORMALIZE_BBOX:
+                net = self.solver.net
+                
+                if 'bbox_pred_rpn' in net.params:
+                    bbox_pred = 'bbox_pred_rpn'
+                else:
+                    bbox_pred = 'bbox_pred'                
+
+                # scale and shift with bbox reg normalization;
+                if self.model_to_use == 'rpn':
+                    means = np.zeros((1, 36))
+                    stds = np.zeros((1, 36))
+                    
+                    for i in range(9):
+                        means[:, i*4:i*4+4] = self.bbox_means
+                        stds[:, i*4:i*4+4] = self.bbox_stds
+                    
+                    means = means.ravel()
+                    stds = stds.ravel()
+                    
+                    extended_stds = stds[:, np.newaxis, np.newaxis, np.newaxis]
+                else:
+                    means = self.bbox_means.ravel()
+                    stds = self.bbox_stds.ravel()
+
+                    extended_stds = stds[:, np.newaxis]
+                    
+                net.params[bbox_pred][0].data[...] = \
+                        (net.params[bbox_pred][0].data /
+                         extended_stds)
+                net.params[bbox_pred][1].data[...] = \
+                        ((net.params[bbox_pred][1].data - means) /
+                         stds)
+            
+        elif pretrained_model is not None:
             print ('Loading pretrained model '
                    'weights from {:s}').format(pretrained_model)
             self.solver.net.copy_from(pretrained_model)
@@ -108,11 +147,13 @@ class SolverWrapper(object):
         filename = self.solver_param.snapshot_prefix + infix
         if self.model_to_use == 'frcnn':
             filename += '_with_{:s}'.format(self.proposal)
-        filename += '_iter_{:d}'.format(self.solver.iter) + '.caffemodel'
+        #filename += '_iter_{:d}'.format(self.solver.iter) + '.caffemodel'
         filename = os.path.join(self.output_dir, filename)
 
-        net.save(str(filename))
-        print 'Wrote snapshot to: {:s}'.format(filename)
+        #net.save(str(filename))
+        #print 'Wrote snapshot to: {:s}'.format(filename)
+
+        self.solver.snapshot(str(filename))        
 
         if cfg.TRAIN.BBOX_REG:
             # restore net to original state
@@ -153,11 +194,12 @@ def get_training_roidb(imdb, model_to_use):
     return imdb.roidb
 
 def train_net(solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
-              pretrained_model=None, max_iters=40000,
+              pretrained_model=None, restore=None, max_iters=40000,
               model_to_use='frcnn', proposal='ss'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
                        pretrained_model=pretrained_model,
+                       restore=restore,
                        model_to_use=model_to_use,
                        proposal=proposal)
 
