@@ -258,8 +258,14 @@ def _sample_rois_rpn(roidb, fg_rois_per_image, rois_per_image, num_classes,
         axis2 = fg_ind / conv_width % conv_height
         axis3 = fg_ind % conv_width
         
-        img_height = blobs['data'].shape[2]
-        img_width = blobs['data'].shape[3]
+        im = cv2.imread(roidb['image'])
+        target_size = cfg.TRAIN.SCALES[0]
+        im, im_scale = prep_im_for_blob(im, 0, target_size,
+                                        cfg.TRAIN.MAX_SIZE,
+                                        cfg.TRAIN.MIN_SIZE)
+        
+        img_height = im.shape[2]
+        img_width = im.shape[3]
         proposal_rects = get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, axis3)
         
         for proposal_rect in proposal_rects:
@@ -393,7 +399,8 @@ def _get_image_blob(roidb, scale_inds):
             im = im[:, ::-1, :]
         target_size = cfg.TRAIN.SCALES[scale_inds[i]]
         im, im_scale = prep_im_for_blob(im, cfg.PIXEL_MEANS, target_size,
-                                        cfg.TRAIN.MAX_SIZE)
+                                        cfg.TRAIN.MAX_SIZE,
+                                        cfg.TRAIN.MIN_SIZE)
         im_scales.append(im_scale)
         processed_ims.append(im)
 
@@ -491,6 +498,8 @@ def _vis_minibatch_rpn(im_blob, conv_h, conv_w, rois_blob, labels_blob, roidb, b
         # DJDJ
         #if roidb[i]['image'].endswith('000009.jpg') == False:
         #    continue
+        
+        print 'image : %s' % roidb[i]['image']
         
         resized_gt_boxes = roidb[int(i)]['resized_gt_boxes']
         im = im_blob[i, :, :, :].transpose((1, 2, 0)).copy()
