@@ -29,10 +29,14 @@ class imagenet(datasets.pascal_voc):
         self._devkit_path = self._get_default_path() if devkit_path is None \
                             else devkit_path
         self._data_path = self._get_default_path()
+        
         self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
         self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_train_0000'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/new_ILSVRC2014_train_000/ILSVRC2014_train_0000'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
+        #self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
+        #self._image_path = self._data_path + '/ILSVRC2013_DET_val'
+        
         class_name_list_file = 'data/imagenet_det.txt'
         self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
                                                class_name_list_file)
@@ -57,6 +61,8 @@ class imagenet(datasets.pascal_voc):
                        'use_salt' : True,
                        'top_k'    : 2000}
 
+        print 'self._image_path : %s' % self._image_path
+        
         assert os.path.exists(self._devkit_path), \
                 'Imagenet devkit path does not exist: {}'.format(self._devkit_path)
         assert os.path.exists(self._data_path), \
@@ -93,13 +99,22 @@ class imagenet(datasets.pascal_voc):
         return image_path
     
     def _load_image_set_index(self):
-        image_index = []
-        for label_file in os.listdir(self._label_path):
-            image_index.append(label_file[:-4])
+        if self._image_set == 'train':
+            image_index = []
+            for label_file in os.listdir(self._label_path):
+                image_index.append(label_file[:-4])
+        else:
+            image_set_file = os.path.join(self._data_path, 'ILSVRC2014_devkit/data/det_lists',
+                                          self._image_set + '.txt')
+            assert os.path.exists(image_set_file), \
+                    'Path does not exist: {}'.format(image_set_file)
+            with open(image_set_file) as f:
+                image_index = [x.split(' ')[0] for x in f.readlines()]
         return image_index
-
+            
     def _get_default_path(self):
-        return os.path.join('/home/nvidia/www/data/ilsvrc14')
+        #return os.path.join('/home/nvidia/www/data/ilsvrc14')
+        return os.path.join('E:/data/ilsvrc14')
 
     def gt_roidb(self):
         """

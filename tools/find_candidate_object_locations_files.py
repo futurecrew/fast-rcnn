@@ -114,13 +114,11 @@ class Detector(object):
         return no_to_find, no_found
 
     
-    def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
+    def gogo(self, MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, data_folder, data_ext, prototxt, 
              caffemodel, gt, data_list, test_data, model_name, step):
         NMS_THRESH = 0.7
         match_threshold = 0.5
         
-        image_folder = voc_base_folder + '/JPEGImages'
-
         with open(gt, 'rb') as fid:
             gtdb = cPickle.load(fid)
                         
@@ -130,9 +128,18 @@ class Detector(object):
         total_no_to_find = 0
         total_no_found = 0
         box_list_to_save = []
-        input_data = open(data_list).readlines()
+        
+        if os.path.exists(data_list):
+            input_data = open(data_list).readlines()
+        else:
+            input_data = []
+            for file in os.listdir(data_folder):
+                if os.path.isfile(data_folder + '/' + file):
+                    input_data.append(file.split('.' + data_ext)[0])
         
         for index, file_name in enumerate(input_data):
+            if ' ' in file_name:
+                file_name = file_name.split(' ')[0]
             file_name = file_name.replace('\n', '').replace('\r', '')
             
             if len(file_name) == 0:
@@ -144,7 +151,9 @@ class Detector(object):
             #if file_name != '000009':
             #    continue
             
-            im = cv2.imread(image_folder + '/' + file_name + '.jpg')
+            #print 'data file : %s' % (data_folder + '/' + file_name)
+            
+            im = cv2.imread(data_folder + '/' + file_name + '.' + data_ext)
             
             org_img_height = im.shape[0]
             org_img_width = im.shape[1]
@@ -246,6 +255,18 @@ def parse_args():
     parser.add_argument('--data_type', dest='data_type',
                         help='data_type(trainval or test)',
                         default=None, type=str)
+    parser.add_argument('--data_list', dest='data_list',
+                        help='data list file',
+                        default=None, type=str)
+    parser.add_argument('--data_folder', dest='data_folder',
+                        help='data folder',
+                        default=None, type=str)
+    parser.add_argument('--data_ext', dest='data_ext',
+                        help='data extension(jpg, JPEG)',
+                        default=None, type=str)
+    parser.add_argument('--gt', dest='gt',
+                        help='ground truth rdb pickle file',
+                        default=None, type=str)
     parser.add_argument('--model_name', dest='model_name',
                         default='vgg_cnn_m_1024', type=str)
     parser.add_argument('--step', dest='step',
@@ -263,14 +284,6 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    voc_base_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/'
-    
-    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
-    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_bbox_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
-    #prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
-
-    iters = 80000
-    
     MAX_CAND_BEFORE_NMS = 10000
     
     args = parse_args()
@@ -292,14 +305,21 @@ if __name__ == '__main__':
     MAX_CAND_AFTER_NMS = args.max_output
     prototxt = args.prototxt
     model_name = args.model_name
+    data_list = args.data_list
+    data_folder = args.data_folder
+    data_ext = args.data_ext
+    gt = args.gt
 
-    data_list = voc_base_folder + '/ImageSets/Main/%s.txt' % args.data_type
-    gt = '/home/nvidia/www/workspace/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
+    #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
+    #prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
+    #data_list = 'E:\data\VOCdevkit\VOC2007\ImageSets\Main/val.txt'
+    #gt = 'E:\project\fast-rcnn\data\cache/voc_2007_test_gt_roidb.pkl'
+    #voc_base_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/'
+
+    #/home/nvidia/www/workspace/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
     
-    #cfg_file = 'E:/project/fast-rcnn/experiments/cfgs/faster_rcnn.yml'
-
     caffe.set_mode_gpu()
     
     detector = Detector()
-    detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, voc_base_folder, prototxt, 
+    detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, data_folder, data_ext, prototxt, 
                   caffemodel, gt, data_list, test_data, model_name, step)

@@ -2,3 +2,6 @@
 .ipynb_checkpoints
 utils/*.c
 utils/*.so
+/lib/build/temp.win-amd64-2.7/Release/utils/nms.obj
+/lib/build/temp.win-amd64-2.7/Release/utils/cython_nms.exp
+/lib/build/temp.win-amd64-2.7/Release/utils/cython_nms.lib

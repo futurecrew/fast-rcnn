@@ -39,7 +39,7 @@ def _init_imdb(model_to_use, proposal, proposal_file):
                 __sets[name] = (lambda split=split, year=year, top_k=top_k:
                         _selective_search_IJCV_top_k(split, year, top_k))
                 
-    for split in ['train']:
+    for split in ['train', 'val', 'test']:
         name = 'imagenet_{}'.format(split)
         __sets[name] = (lambda split=split:
                 datasets.imagenet(split, model_to_use, proposal, proposal_file))
