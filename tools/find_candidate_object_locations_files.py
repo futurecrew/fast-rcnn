@@ -25,7 +25,7 @@ from caffe import nms_cuda
 from util import prevent_sleep
 
 class Detector(object):
-    def check_match(self, file_name, im_blob, ground_rects, pred_rects, match_threshold, scores, rigid_rects):
+    def check_match(self, file_name, file_full_path, im_blob, ground_rects, pred_rects, match_threshold, scores, rigid_rects):
         found_rects = []
         
         no_to_find = len(ground_rects)
@@ -58,13 +58,12 @@ class Detector(object):
         print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
 
         if False:
-            im = im_blob[0, :, :, :].transpose((1, 2, 0)).copy()
-            im += cfg.PIXEL_MEANS
+        #if True and file_name == 'ILSVRC2014_train_00000016':
+            im = cv2.imread(file_full_path)
             im = im[:, :, (2, 1, 0)]
-            im = im.astype(np.uint8)
-            
             
             plt.imshow(im)
+            ground_rects = np.asarray(ground_rects, np.float)
             for ground_rect in ground_rects: 
                 plt.gca().add_patch(
                     plt.Rectangle((ground_rect[0], ground_rect[1]), ground_rect[2] - ground_rect[0],
@@ -121,6 +120,10 @@ class Detector(object):
         
         with open(gt, 'rb') as fid:
             gtdb = cPickle.load(fid)
+            
+        gt_dic = {}
+        for gt in gtdb:
+            gt_dic[gt['label_file']] = gt['boxes']
                         
         net = caffe.Net(prototxt, caffemodel, caffe.TEST)
         
@@ -183,10 +186,15 @@ class Detector(object):
             # Rescale boxes back according to the original image size
             pred_boxes = pred_boxes / im_scale_factors[0]        
             rigid_rects = rigid_rects / im_scale_factors[0]        
-            gt_boxes = gtdb[no-1]['boxes']
             
-            #gt_boxes = gtdb[no-1]['boxes'] * im_scale_factors
-
+            #gt_boxes = gtdb[no-1]['boxes']
+            label_file = file_name + '.xml'
+            
+            if label_file in gt_dic:
+                gt_boxes = gt_dic[file_name + '.xml']
+            else:
+                gt_boxes = []
+            
             
             #for pred_box in pred_boxes:
             #    print 'pred_box : %s' % (pred_box, )
@@ -194,7 +202,10 @@ class Detector(object):
             #for gt_box in gt_boxes:
             #    print 'gt_box : %s' % (gt_box, )
                 
-            no_to_find, no_found = self.check_match(file_name, blobs['data'], gt_boxes, 
+            file_full_path = data_folder + '/' + file_name + '.' + data_ext
+            
+            no_to_find, no_found = self.check_match(file_name, file_full_path,
+                                                    blobs['data'], gt_boxes, 
                                                     pred_boxes, match_threshold, 
                                                     sorted_scores, rigid_rects)
 

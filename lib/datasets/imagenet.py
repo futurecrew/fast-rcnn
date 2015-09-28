@@ -30,10 +30,10 @@ class imagenet(datasets.pascal_voc):
                             else devkit_path
         self._data_path = self._get_default_path()
         
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
         #self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
         #self._image_path = self._data_path + '/ILSVRC2013_DET_val'
         
@@ -132,6 +132,7 @@ class imagenet(datasets.pascal_voc):
                 roidb = cPickle.load(fid)
                 self._image_index = cPickle.load(fid)
             print '{} gt roidb loaded from {}'.format(self.name, cache_file)
+            print 'len(self._image_index) : %s' % len(self._image_index)
             
             self._gt_roidb = roidb
             return roidb
@@ -156,6 +157,7 @@ class imagenet(datasets.pascal_voc):
             cPickle.dump(gt_roidb, fid, cPickle.HIGHEST_PROTOCOL)
             cPickle.dump(self._image_index, fid, cPickle.HIGHEST_PROTOCOL)
         print 'wrote gt roidb to {}'.format(cache_file)
+        print 'len(self._image_index) : %s' % len(self._image_index)
 
         self._gt_roidb = gt_roidb
         return gt_roidb
@@ -311,6 +313,7 @@ class imagenet(datasets.pascal_voc):
             
             if x2 <= x1 or y2 <= y1:
                 boxes = np.delete(boxes, len(boxes)-1, 0)
+                print '%s is deleted here. (%d, %d, %d, %d)' % (label_file, x1, y1, x2, y2)
                 continue
             
             boxes[ix, :] = [x1, y1, x2, y2]
@@ -318,11 +321,15 @@ class imagenet(datasets.pascal_voc):
             overlaps[ix, cls] = 1.0
             ix += 1
 
+        if ix == 0:
+            return None
+        
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
         return {'boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
+                'label_file' : label_file,
                 'flipped' : False}
 
 

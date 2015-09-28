@@ -210,6 +210,8 @@ def prepare_roidb(imdb, model_to_use):
         bbox_sums = np.zeros((num_classes, 4))
         bbox_squared_sums = np.zeros((num_classes, 4))
 
+    print 'len(imdb.image_index) : %s' % len(imdb.image_index)
+
     for i in xrange(len(imdb.image_index)):
         
         # DJDJ
@@ -257,6 +259,7 @@ def prepare_roidb(imdb, model_to_use):
         if i % 100 == 0:
             print 'processing image %s' % i
 
+    print 'processed %d images' % (i + 1)
 
     imdb.bbox_means = bbox_sums / bbox_class_counts
     imdb.bbox_stds = np.sqrt(bbox_squared_sums / bbox_class_counts - imdb.bbox_means ** 2)
