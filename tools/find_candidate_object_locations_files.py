@@ -125,7 +125,8 @@ class Detector(object):
         
         gt_dic = {}
         for gt in gtdb:
-            if 'label_file' in gt == False:
+            check = 'label_file' in gt
+            if check == False:
                 use_label_file = False
                 break
             label_file = gt['label_file']
@@ -260,6 +261,9 @@ def parse_args():
     Parse input arguments
     """
     parser = argparse.ArgumentParser(description='Generate RPN detections')
+    parser.add_argument('--gpu', dest='gpu_id',
+                        help='GPU device id to use [0]',
+                        default=0, type=int)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
@@ -337,6 +341,7 @@ if __name__ == '__main__':
         elif args.data_type == 'test':
             gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
             data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+        data_folder = 'E:/data/VOCdevkit/VOC2007/JPEGImages/'
         data_ext = 'jpg'
     elif 'imagenet' in args.imdb_name:
         if args.data_type == 'train' or args.data_type == 'trainval' :
@@ -359,6 +364,8 @@ if __name__ == '__main__':
     #/home/nvidia/www/workspace/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
     
     caffe.set_mode_gpu()
+    if args.gpu_id is not None:
+        caffe.set_device(args.gpu_id)
     
     detector = Detector()
     detector.gogo(MAX_CAND_BEFORE_NMS, MAX_CAND_AFTER_NMS, data_folder, data_ext, prototxt, 
