@@ -58,7 +58,7 @@ class Detector(object):
         print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
 
         if False:
-        #if True and file_name == 'ILSVRC2014_train_00000016':
+        #if True and file_name == 'ILSVRC2012_val_00000096':
             im = cv2.imread(file_full_path)
             im = im[:, :, (2, 1, 0)]
             
@@ -121,10 +121,18 @@ class Detector(object):
         with open(gt, 'rb') as fid:
             gtdb = cPickle.load(fid)
             
+        use_label_file = True
+        
         gt_dic = {}
         for gt in gtdb:
-            gt_dic[gt['label_file']] = gt['boxes']
-                        
+            if 'label_file' in gt == False:
+                use_label_file = False
+                break
+            label_file = gt['label_file']
+            gt_dic[label_file] = gt['boxes']
+        
+        print 'use_label_file : %s' % use_label_file
+        
         net = caffe.Net(prototxt, caffemodel, caffe.TEST)
         
         no = 0
@@ -132,7 +140,7 @@ class Detector(object):
         total_no_found = 0
         box_list_to_save = []
         
-        if os.path.exists(data_list):
+        if data_list != None and os.path.exists(data_list):
             input_data = open(data_list).readlines()
         else:
             input_data = []
@@ -187,14 +195,15 @@ class Detector(object):
             pred_boxes = pred_boxes / im_scale_factors[0]        
             rigid_rects = rigid_rects / im_scale_factors[0]        
             
-            #gt_boxes = gtdb[no-1]['boxes']
-            label_file = file_name + '.xml'
-            
-            if label_file in gt_dic:
-                gt_boxes = gt_dic[file_name + '.xml']
+            if use_label_file:
+                label_file = file_name + '.xml'
+                
+                if label_file in gt_dic:
+                    gt_boxes = gt_dic[file_name + '.xml']
+                else:
+                    gt_boxes = []
             else:
-                gt_boxes = []
-            
+                gt_boxes = gtdb[no-1]['boxes']
             
             #for pred_box in pred_boxes:
             #    print 'pred_box : %s' % (pred_box, )
@@ -319,7 +328,27 @@ if __name__ == '__main__':
     data_list = args.data_list
     data_folder = args.data_folder
     data_ext = args.data_ext
-    gt = args.gt
+    
+
+    if 'voc_2007' in args.imdb_name:
+        if args.data_type == 'trainval':
+            gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
+            data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+        elif args.data_type == 'test':
+            gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
+            data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+        data_ext = 'jpg'
+    elif 'imagenet' in args.imdb_name:
+        if args.data_type == 'train' or args.data_type == 'trainval' :
+            gt = 'data/cache/imagenet_train_gt_roidb.pkl'
+            data_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        elif args.data_type == 'test':
+            gt = 'data/cache/imagenet_val_gt_roidb.pkl'
+            data_folder = 'E:/data/ilsvrc14/ILSVRC2013_DET_val'
+        data_ext = 'JPEG'
+            
+    print 'using gt : %s' % gt
+
 
     #caffemodel = 'E:/project/fast-rcnn/output/faster_rcnn_cls_only/voc_2007_trainval/vgg_cnn_m_1024_rpn_iter_100.caffemodel'
     #prototxt = 'E:/project/fast-rcnn/models/VGG_CNN_M_1024/rpn/test.prototxt'
