@@ -196,6 +196,7 @@ def prepare_roidb(imdb, model_to_use):
             imdb._roidb = cPickle.load(fid)
         
         print '{} roidb file is loaded from {}'.format(imdb.name, cache_file_roidb)
+        print 'len(imdb._roidb) : %s' % len(imdb._roidb)
         return
 
     num_classes = imdb.num_classes

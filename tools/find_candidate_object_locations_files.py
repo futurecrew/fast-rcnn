@@ -26,111 +26,171 @@ from caffe import nms_cuda
 from util import prevent_sleep
 
 
-class Detector(object):
- 
-    def gogo(self, MAX_CAND_AFTER_NMS, MULTI_NO,
-             data_folder, data_ext, prototxt, 
-             caffemodel, gt, data_list, test_data, model_name, step):
-        with open(gt, 'rb') as fid:
-            gtdb = cPickle.load(fid)
-        
-        self.total_no_to_find = 0
-        self.total_no_found = 0
-        total_box_list_to_save = []
+def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
+         data_folder, data_ext, prototxt, 
+         caffemodel, gt, data_list, test_data, model_name, step):
+    with open(gt, 'rb') as fid:
+        gtdb = cPickle.load(fid)
+    
+    total_no_to_find = 0
+    total_no_found = 0
 
-        net = caffe.Net(prototxt, caffemodel, caffe.TEST)
+    start_time = time.time()
+    
+    # DJDJ
+    #gtdb = gtdb[0:100]
+    
+    if data_list != None and os.path.exists(data_list):
+        input_data = open(data_list).readlines()
+    else:
+        input_data = []
+        for gt in gtdb:
+            input_data.append(gt['label_file'].split('.xml')[0])
+    
+    queue_gpu_to_main = Queue()
+    total_data_no = len(input_data)
+    chunk_size = total_data_no / len(gpu_id_list)
+    if total_data_no % len(gpu_id_list) > 0:
+        chunk_size += 1
+    
+    for i in range(len(gpu_id_list)):
+        start_idx = chunk_size * i
+        end_idx = min(chunk_size * (i + 1), total_data_no)
+        gpu_id = gpu_id_list[i]
         
-        start_time = time.time()
+        print 'creating a gpu process[%s] (%s ~ %s)' % (gpu_id, start_idx, end_idx-1)
+        p = Process(target=gogo_one_gpu, args=(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
+                                               gpu_id, queue_gpu_to_main,
+                                               data_folder, data_ext, prototxt, 
+                                               input_data[start_idx : end_idx], 
+                                               gtdb[start_idx : end_idx],
+                                               caffemodel))
+        p.start()
+
+    end_gpu_no = 0
+    ret_list = []
+    total_box_list_to_save = []
+    while True:
+        queue_data = queue_gpu_to_main.get()
+        end_gpu_no += 1
+        ret_list.append(queue_data)
         
-        # DJDJ
-        #gtdb = gtdb[0:1000]
-        
-        if data_list != None and os.path.exists(data_list):
-            input_data = open(data_list).readlines()
+        print 'get end_gpu %s' % queue_data['gpuid']
+        if end_gpu_no == len(gpu_id_list):
+            break
         else:
-            input_data = []
-            for gt in gtdb:
-                input_data.append(gt['label_file'].split('.xml')[0])
-        
-        process_list = []
-        processLock = Lock()
-        queue_child_to_parent = Queue()
-        queue_parent_to_child_list = []
-        total_data_no = len(input_data)
-        chunk_size = total_data_no / MULTI_NO
-        if total_data_no % MULTI_NO > 0:
-            chunk_size += 1
-        
-        for i in range(MULTI_NO):
-            queue_parent_to_child = Queue()
-            queue_parent_to_child_list.append(queue_parent_to_child)
-            start_idx =  chunk_size * i
-            end_idx = min(chunk_size * (i + 1), total_data_no)
+            continue
+
+    total_no_to_find = 0
+    total_no_found = 0
             
-            print 'creating a thread[%s] (%s ~ %s)' % (i, start_idx, end_idx-1)
-            p = Process(target=predict, args=(i, input_data[start_idx : end_idx], 
-                                       gtdb[start_idx : end_idx], data_folder, 
-                                       data_ext, queue_child_to_parent, 
-                                       queue_parent_to_child, 
-                                       processLock,
-                                       MAX_CAND_AFTER_NMS))
-            p.start()
-            process_list.append(p)
+    for gpu_id in gpu_id_list:
+        for ret_value in ret_list:
+            if ret_value['gpuid'] == gpu_id:
+                total_no_to_find += ret_value['total_no_to_find']
+                total_no_found += ret_value['total_no_found']
+                total_box_list_to_save.extend(ret_value['box_list_to_save'])
+                break
+
+
+    print 'total elapsed time = %.1f min' % (float(time.time() - start_time) / 60)
+    print 'total accuracy [%s/%s] : %.3f' % (total_no_found, total_no_to_find,
+                                             float(total_no_found) / float(total_no_to_find))  
+    
+    # Save RPN proposal boxes    
+    proposal_folder  = 'output/rpn_data/' + test_data 
+    proposal_file = proposal_folder + '/' + model_name + '_' + step + '_rpn_top_' + str(MAX_CAND_AFTER_NMS) + '_candidate.pkl'
+
+    if not os.path.exists(proposal_folder):
+        os.makedirs(proposal_folder)
+
+    with open(proposal_file, 'wb') as fid:
+        cPickle.dump(total_box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
+    print 'wrote rpn roidb to {}'.format(proposal_file)            
+    
         
-        end_child_no = 0
-        ret_list = []
-        while True:
-            queue_data = queue_child_to_parent.get()
-            if 'box_list_to_save' in queue_data:
-                end_child_no += 1
-                ret_list.append(queue_data)
-                
-                print 'get end_child %s' % queue_data['pid']
-                if end_child_no == MULTI_NO:
-                    break
-                else:
-                    continue
+def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
+                 gpuid, queue_gpu_to_main,
+                 data_folder, data_ext, prototxt, 
+                 input_data, gtdb,
+                 caffemodel):
 
-            pid = queue_data['pid']
-            blob_data = queue_data['blob_data']
-                             
-            net.blobs['data'].reshape(*(blob_data.shape))
-            
-            blobs_out = net.forward(data=blob_data.astype(np.float32, copy=False))
-            
-            queue_parent_to_child = queue_parent_to_child_list[pid]
-            queue_parent_to_child.put(blobs_out)
-
-
-        total_no_to_find = 0
-        total_no_found = 0
-                
-        for i in range(len(process_list)):
-            for ret_value in ret_list:
-                if ret_value['pid'] == i:
-                    total_no_to_find += ret_value['total_no_to_find']
-                    total_no_found += ret_value['total_no_found']
-                    total_box_list_to_save.extend(ret_value['box_list_to_save'])
-                    break
-
-        print 'total elapsed time = %.1f min' % (float(time.time() - start_time) / 60)
-        print 'total accuracy [%s/%s] : %.3f' % (total_no_found, total_no_to_find,
-                                                 float(total_no_found) / float(total_no_to_find))  
+    caffe.set_mode_gpu()
+    caffe.set_device(gpuid)
         
-        # Save RPN proposal boxes    
-        proposal_folder  = 'output/rpn_data/' + test_data 
-        proposal_file = proposal_folder + '/' + model_name + '_' + step + '_rpn_top_' + str(MAX_CAND_AFTER_NMS) + '_candidate.pkl'
+    net = caffe.Net(prototxt, caffemodel, caffe.TEST)
+    
+    process_list = []
+    total_box_list_to_save = []
+    queue_child_to_gpu = Queue()
+    queue_gpu_to_child_list = []
+    total_data_no = len(input_data)
+    chunk_size = total_data_no / MULTI_CPU_NO
+    if total_data_no % MULTI_CPU_NO > 0:
+        chunk_size += 1
+    
+    for i in range(MULTI_CPU_NO):
+        queue_gpu_to_child = Queue()
+        queue_gpu_to_child_list.append(queue_gpu_to_child)
+        start_idx =  chunk_size * i
+        end_idx = min(chunk_size * (i + 1), total_data_no)
+        
+        print 'creating a child process[%s] (%s ~ %s)' % (i, start_idx, end_idx-1)
+        p = Process(target=predict, args=(gpuid, i, input_data[start_idx : end_idx], 
+                                   gtdb[start_idx : end_idx], data_folder, 
+                                   data_ext, queue_child_to_gpu, 
+                                   queue_gpu_to_child, 
+                                   MAX_CAND_AFTER_NMS))
+        p.start()
+        process_list.append(p)
+    
+    end_child_no = 0
+    ret_list = []
+    while True:
+        queue_data = queue_child_to_gpu.get()
+        if 'box_list_to_save' in queue_data:
+            end_child_no += 1
+            ret_list.append(queue_data)
+            
+            print 'get end_child %s' % queue_data['pid']
+            if end_child_no == MULTI_CPU_NO:
+                break
+            else:
+                continue
 
-        if not os.path.exists(proposal_folder):
-            os.makedirs(proposal_folder)
+        pid = queue_data['pid']
+        blob_data = queue_data['blob_data']
+                         
+        net.blobs['data'].reshape(*(blob_data.shape))
+        
+        blobs_out = net.forward(data=blob_data.astype(np.float32, copy=False))
+        
+        queue_gpu_to_child = queue_gpu_to_child_list[pid]
+        queue_gpu_to_child.put(blobs_out)
 
-        with open(proposal_file, 'wb') as fid:
-            cPickle.dump(total_box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
-        print 'wrote rpn roidb to {}'.format(proposal_file)            
 
-def predict(pid, input_data, gtdb, data_folder, data_ext, 
-            queue_child_to_parent, queue_parent_to_child, 
-            processLock, MAX_CAND_AFTER_NMS):
+    total_no_to_find = 0
+    total_no_found = 0
+            
+    for i in range(len(process_list)):
+        for ret_value in ret_list:
+            if ret_value['pid'] == i:
+                total_no_to_find += ret_value['total_no_to_find']
+                total_no_found += ret_value['total_no_found']
+                total_box_list_to_save.extend(ret_value['box_list_to_save'])
+                break
+
+    queue_data = {}
+    queue_data['gpuid'] = gpuid
+    queue_data['total_no_to_find'] = total_no_to_find
+    queue_data['total_no_found'] = total_no_found
+    queue_data['box_list_to_save'] = total_box_list_to_save
+            
+    queue_gpu_to_main.put(queue_data)
+
+def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext, 
+            queue_child_to_gpu, queue_gpu_to_child, 
+            MAX_CAND_AFTER_NMS):
     MAX_CAND_BEFORE_NMS = 10000
     NMS_THRESH = 0.7
     match_threshold = 0.5
@@ -176,8 +236,8 @@ def predict(pid, input_data, gtdb, data_folder, data_ext,
         queue_data['pid'] = pid
         queue_data['blob_data'] = blobs['data']
 
-        queue_child_to_parent.put(queue_data)
-        blobs_out = queue_parent_to_child.get()
+        queue_child_to_gpu.put(queue_data)
+        blobs_out = queue_gpu_to_child.get()
 
         cls_pred = blobs_out['cls_pred']
         if 'bbox_pred_rpn' in blobs_out:
@@ -213,7 +273,7 @@ def predict(pid, input_data, gtdb, data_folder, data_ext,
         total_no_to_find += no_to_find
         total_no_found += no_found
          
-        print 'pid [%s][%s/%s] accuracy : %.3f' % (pid, no, 
+        print 'gpu pid [%s][%s][%s/%s] accuracy : %.3f' % (gpuid, pid, no, 
                                                       len(input_data), 
                                                       float(total_no_found) / float(total_no_to_find))  
         
@@ -241,7 +301,7 @@ def predict(pid, input_data, gtdb, data_folder, data_ext,
     queue_data['total_no_to_find'] = total_no_to_find
     queue_data['total_no_found'] = total_no_found
     queue_data['box_list_to_save'] = box_list_to_save
-    queue_child_to_parent.put(queue_data)    
+    queue_child_to_gpu.put(queue_data)    
 
     print 'finishing child process %s' % pid
 
@@ -339,7 +399,7 @@ def parse_args():
     parser = argparse.ArgumentParser(description='Generate RPN detections')
     parser.add_argument('--gpu', dest='gpu_id',
                         help='GPU device id to use [0]',
-                        default=0, type=int)
+                        default='0', type=str)
     parser.add_argument('--weights', dest='pretrained_model',
                         help='initialize with pretrained model weights',
                         default=None, type=str)
@@ -384,7 +444,7 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    MULTI_NO = 10
+    MULTI_CPU_NO = 3
     
     args = parse_args()
 
@@ -396,6 +456,13 @@ if __name__ == '__main__':
 
     print('Using config:')
     pprint.pprint(cfg)
+    
+    if args.gpu_id is not None:
+        gpu_id_list = []
+        for gpu_id in args.gpu_id.split(','):
+            gpu_id_list.append(int(gpu_id.strip()))
+    else:
+        gpu_id_list = None
     
     prevent_sleep()
 
@@ -439,11 +506,6 @@ if __name__ == '__main__':
 
     #/home/nvidia/www/workspace/fast-rcnn/data/cache/voc_2007_%s_gt_roidb.pkl' % args.data_type
     
-    caffe.set_mode_gpu()
-    if args.gpu_id is not None:
-        caffe.set_device(args.gpu_id)
-    
-    detector = Detector()
-    detector.gogo(MAX_CAND_AFTER_NMS, MULTI_NO, 
-                  data_folder, data_ext, prototxt, 
-                  caffemodel, gt, data_list, test_data, model_name, step)
+    gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO, 
+          data_folder, data_ext, prototxt, 
+          caffemodel, gt, data_list, test_data, model_name, step)

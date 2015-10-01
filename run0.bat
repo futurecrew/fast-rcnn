@@ -39,8 +39,9 @@ if "%step_1%" equ "true" (
   echo "----------------------------------------------------------------------------------"
   echo "Step 1 : Generate RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  tools\find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/%model_L%_rpn_iter_%iters_rpn%.caffemodel --prototxt models/%model%/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name %model_L% --step 1
-  tools\find_candidate_object_locations_files.py --weights output/faster_rcnn_lazy/voc_2007_trainval/%model_L%_rpn_iter_%iters_rpn%.caffemodel --prototxt models/%model%/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name %model_L% --step 1
+  tools\find_candidate_object_locations_files.py --imdb %imdb% --weights output/faster_rcnn_lazy/%imdb%/%model_L%_rpn_iter_%iters_rpn%.caffemodel --prototxt models/%model%/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type trainval --model_name %model_L% --gt data/cache/%imdb%_gt_roidb.pkl --step 1
+  tools\find_candidate_object_locations_files.py --imdb %imdb% --weights output/faster_rcnn_lazy/%imdb%/%model_L%_rpn_iter_%iters_rpn%.caffemodel --prototxt models/%model%/rpn/test.prototxt --cfg experiments/cfgs/faster_rcnn_lazy.yml --data_type test --model_name %model_L% --gt data/cache/%imdb%_gt_roidb.pkl --step 1
+  
 )
 
 if "%step_2%" equ "true" (
