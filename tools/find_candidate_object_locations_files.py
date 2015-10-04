@@ -38,7 +38,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     start_time = time.time()
     
     # DJDJ
-    #gtdb = gtdb[0:100]
+    #gtdb = gtdb[0:300]
     
     if data_list != None and os.path.exists(data_list):
         input_data = open(data_list).readlines()
@@ -53,6 +53,10 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     if total_data_no % len(gpu_id_list) > 0:
         chunk_size += 1
     
+    proposal_folder  = 'output/rpn_data/' + test_data 
+    if not os.path.exists(proposal_folder):
+        os.makedirs(proposal_folder)
+        
     for i in range(len(gpu_id_list)):
         start_idx = chunk_size * i
         end_idx = min(chunk_size * (i + 1), total_data_no)
@@ -62,18 +66,17 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
         p = Process(target=gogo_one_gpu, args=(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
                                                gpu_id, queue_gpu_to_main,
                                                data_folder, data_ext, prototxt, 
+                                               proposal_folder,
                                                input_data[start_idx : end_idx], 
                                                gtdb[start_idx : end_idx],
                                                caffemodel))
         p.start()
 
     end_gpu_no = 0
-    ret_list = []
     total_box_list_to_save = []
     while True:
         queue_data = queue_gpu_to_main.get()
         end_gpu_no += 1
-        ret_list.append(queue_data)
         
         print 'get end_gpu %s' % queue_data['gpuid']
         if end_gpu_no == len(gpu_id_list):
@@ -85,12 +88,13 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     total_no_found = 0
             
     for gpu_id in gpu_id_list:
-        for ret_value in ret_list:
-            if ret_value['gpuid'] == gpu_id:
-                total_no_to_find += ret_value['total_no_to_find']
-                total_no_found += ret_value['total_no_found']
-                total_box_list_to_save.extend(ret_value['box_list_to_save'])
-                break
+        file = proposal_folder + '/gpu_result_' + str(gpu_id) + '.pickle'
+        with open(file, 'rb') as fid:
+            dump_data = cPickle.load(fid)
+            print 'read pickled data : %s' % file
+            total_no_to_find += dump_data['total_no_to_find']
+            total_no_found += dump_data['total_no_found']
+            total_box_list_to_save.extend(dump_data['box_list_to_save'])
 
 
     print 'total elapsed time = %.1f min' % (float(time.time() - start_time) / 60)
@@ -98,11 +102,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
                                              float(total_no_found) / float(total_no_to_find))  
     
     # Save RPN proposal boxes    
-    proposal_folder  = 'output/rpn_data/' + test_data 
     proposal_file = proposal_folder + '/' + model_name + '_' + step + '_rpn_top_' + str(MAX_CAND_AFTER_NMS) + '_candidate.pkl'
-
-    if not os.path.exists(proposal_folder):
-        os.makedirs(proposal_folder)
 
     with open(proposal_file, 'wb') as fid:
         cPickle.dump(total_box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
@@ -112,6 +112,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
 def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
                  gpuid, queue_gpu_to_main,
                  data_folder, data_ext, prototxt, 
+                 proposal_folder,
                  input_data, gtdb,
                  caffemodel):
 
@@ -182,10 +183,17 @@ def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
 
     queue_data = {}
     queue_data['gpuid'] = gpuid
-    queue_data['total_no_to_find'] = total_no_to_find
-    queue_data['total_no_found'] = total_no_found
-    queue_data['box_list_to_save'] = total_box_list_to_save
+
+    dump_data = {}
+    dump_data['gpuid'] = gpuid
+    dump_data['total_no_to_find'] = total_no_to_find
+    dump_data['total_no_found'] = total_no_found
+    dump_data['box_list_to_save'] = total_box_list_to_save
             
+    proposal_file = proposal_folder + '/gpu_result_' + str(gpuid) + '.pickle'
+    with open(proposal_file, 'wb') as fid:
+        cPickle.dump(dump_data, fid, cPickle.HIGHEST_PROTOCOL)
+    print 'wrote rpn proposal gpu %s to %s' % (gpuid, proposal_file)            
     queue_gpu_to_main.put(queue_data)
 
 def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext, 
@@ -273,9 +281,13 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
         total_no_to_find += no_to_find
         total_no_found += no_found
          
+        print 'gpu pid [%s][%s][%s/%s]' % (gpuid, pid, no, len(input_data))  
+        
+        """ 
         print 'gpu pid [%s][%s][%s/%s] accuracy : %.3f' % (gpuid, pid, no, 
                                                       len(input_data), 
                                                       float(total_no_found) / float(total_no_to_find))  
+        """
         
         """
         for i in range(len(pred_boxes)):
@@ -335,7 +347,7 @@ def check_match(file_name, file_full_path, im_blob, ground_rects, pred_rects, ma
             
             found_rects.append(max_overlap_rect)
 
-    print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
+    #print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
 
     if False:
     #if True and file_name == 'ILSVRC2012_val_00000096':
@@ -444,7 +456,7 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    MULTI_CPU_NO = 3
+    MULTI_CPU_NO = 4
     
     args = parse_args()
 
@@ -466,7 +478,6 @@ if __name__ == '__main__':
     
     prevent_sleep()
 
-    test_data = args.imdb_name
     step = 'step_%s' % args.step
     caffemodel = args.pretrained_model
     MAX_CAND_AFTER_NMS = args.max_output
@@ -481,18 +492,22 @@ if __name__ == '__main__':
         if args.data_type == 'trainval':
             gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
             data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+            test_data = 'voc_2007_trainval'
         elif args.data_type == 'test':
             gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
             data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+            test_data = 'voc_2007_test'
         data_folder = 'E:/data/VOCdevkit/VOC2007/JPEGImages/'
         data_ext = 'jpg'
     elif 'imagenet' in args.imdb_name:
         if args.data_type == 'train' or args.data_type == 'trainval' :
             gt = 'data/cache/imagenet_train_gt_roidb.pkl'
             data_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+            test_data = 'imagenet_train'
         elif args.data_type == 'test':
             gt = 'data/cache/imagenet_val_gt_roidb.pkl'
             data_folder = 'E:/data/ilsvrc14/ILSVRC2013_DET_val'
+            test_data = 'imagenet_val'
         data_ext = 'JPEG'
             
     print 'using gt : %s' % gt

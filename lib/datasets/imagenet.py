@@ -30,10 +30,10 @@ class imagenet(datasets.pascal_voc):
                             else devkit_path
         self._data_path = self._get_default_path()
         
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
         #self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
         #self._image_path = self._data_path + '/ILSVRC2013_DET_val'
         
@@ -110,6 +110,8 @@ class imagenet(datasets.pascal_voc):
                     'Path does not exist: {}'.format(image_set_file)
             with open(image_set_file) as f:
                 image_index = [x.split(' ')[0] for x in f.readlines()]
+        
+        print '_load_image_set_index() done'
         return image_index
             
     def _get_default_path(self):

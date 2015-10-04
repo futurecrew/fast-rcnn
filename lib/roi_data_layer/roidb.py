@@ -256,6 +256,8 @@ def prepare_roidb(imdb, model_to_use):
         if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
             roidb[i]['max_classes'] = None
             roidb[i]['bbox_targets'] = None
+            if 'max_overlaps' in roidb[i]:
+                roidb[i]['max_overlaps'] = None
             
         if i % 100 == 0:
             print 'processing image %s' % i
