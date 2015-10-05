@@ -511,9 +511,8 @@ if __name__ == '__main__':
         data_ext = 'JPEG'
             
     print 'using gt : %s' % gt
-
+    
 
     gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO, 
           data_folder, data_ext, prototxt, 
           caffemodel, gt, data_list, test_data, model_name, step)
-    

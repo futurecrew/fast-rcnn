@@ -113,6 +113,8 @@ class imagenet(datasets.pascal_voc):
                     'Path does not exist: {}'.format(image_set_file)
             with open(image_set_file) as f:
                 image_index = [x.split(' ')[0] for x in f.readlines()]
+        
+        print '_load_image_set_index() done'
         return image_index
 
     def gt_roidb(self):

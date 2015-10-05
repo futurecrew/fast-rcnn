@@ -196,6 +196,7 @@ def prepare_roidb(imdb, model_to_use):
             imdb._roidb = cPickle.load(fid)
         
         print '{} roidb file is loaded from {}'.format(imdb.name, cache_file_roidb)
+        print 'len(imdb._roidb) : %s' % len(imdb._roidb)
         return
 
     num_classes = imdb.num_classes
@@ -255,6 +256,8 @@ def prepare_roidb(imdb, model_to_use):
         if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
             roidb[i]['max_classes'] = None
             roidb[i]['bbox_targets'] = None
+            if 'max_overlaps' in roidb[i]:
+                roidb[i]['max_overlaps'] = None
             
         if i % 100 == 0:
             print 'processing image %s' % i
