@@ -26,14 +26,17 @@ class imagenet(datasets.pascal_voc):
     def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
-        self._devkit_path = self._get_default_path() if devkit_path is None \
+        self._default_path = '/home/nvidia/www/data/ilsvrc14'
+        #self._default_path = 'E:/data/ilsvrc14'
+
+        self._devkit_path = self._default_path if devkit_path is None \
                             else devkit_path
-        self._data_path = self._get_default_path()
+        self._data_path = self._default_path
         
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
+        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
+        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
         #self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
         #self._image_path = self._data_path + '/ILSVRC2013_DET_val'
         
@@ -111,10 +114,6 @@ class imagenet(datasets.pascal_voc):
             with open(image_set_file) as f:
                 image_index = [x.split(' ')[0] for x in f.readlines()]
         return image_index
-            
-    def _get_default_path(self):
-        #return os.path.join('/home/nvidia/www/data/ilsvrc14')
-        return os.path.join('E:/data/ilsvrc14')
 
     def gt_roidb(self):
         """

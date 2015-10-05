@@ -6,6 +6,7 @@ import numpy as np
 import threading
 import sys
 import time
+import cPickle
 
 class SSThread(threading.Thread):
      def __init__(self, cmd):
@@ -60,13 +61,27 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension,
     start_idx_list = []
     end_idx_list = []
     thread_list = []
+    
+    
+    # DJDJ
+    """
+    start_idx_list = [55892, 209595, 237541, 251514]
+    end_idx_list = [69865, 223568, 251514, 265487]
+    multi_no = len(start_idx_list)
+    """
+    
+    
     for i in range(multi_no):    
         start_idx =  chunk_size * i
         end_idx = min(chunk_size * (i + 1), total_data_no)
-        
         start_idx_list.append(start_idx)
         end_idx_list.append(end_idx)
-        
+
+        # DJDJ
+        """
+        start_idx = start_idx_list[i]
+        end_idx = end_idx_list[i]
+        """
         
         cmd = 'cd {} && '.format(ss_path)
         cmd += '{:s} -nodisplay -nodesktop '.format(ss_exe)
@@ -79,8 +94,7 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension,
         thread = SSThread(cmd)
         thread.start()
         thread_list.append(thread)
-
-        
+    
     while True:
         all_done = True
         for i, start_idx, end_idx in zip(range(multi_no), start_idx_list, end_idx_list):
@@ -93,13 +107,17 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension,
         if all_done == True:
             for i, start_idx, end_idx in zip(range(multi_no), start_idx_list, end_idx_list):
                 done_noti_file = '%s/matlab_ss_noti_%s_%s.txt' % (output_dir, start_idx, end_idx)
-                os.remove(done_noti_file)
+                
+                # DJDJ
+                #os.remove(done_noti_file)
             break
         else:
             time.sleep(5)
                 
     print 'Finished all the selective search processes.'
     
+    # DJDJ
+    #return
     
     #voc_org = sio.loadmat('E:/project/fast-rcnn/data/selective_search_data/voc_2007_train.mat')
     
@@ -116,15 +134,20 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension,
         for j in range(len(a['result'])):
             images[0][start_idx + j] = [file_id[start_idx + j]]
             boxes[start_idx + j] = a['result'][j, 0]
+            
+        print 'read %s' % ss_output_file
         
     a = {}
     a['images'] = images
     a['boxes'] = boxes
     
     final_ss_output_file = '%s/%s' % (output_dir, output_file_name)
-    sio.savemat(final_ss_output_file, a)
     
-    voc_new = sio.loadmat(final_ss_output_file)
+    if '.mat' in output_file_name:
+        sio.savemat(final_ss_output_file, a)
+    else:
+        with open(final_ss_output_file, 'wb') as f:
+            cPickle.dump(a, f, cPickle.HIGHEST_PROTOCOL)
     
     print 'Finished the selective search.'
     
@@ -134,26 +157,38 @@ if __name__ == '__main__':
     ss_path = '/home/nvidia/www/workspace/SelectiveSearchCodeIJCV'
     ss_exe = 'matlab'
 
-    #label_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/Annotations/'
     #img_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/JPEGImages/'
     #output_list = os.getcwd() + '/output/ss/voc_2007_trainval_data_list.txt'
     #output_file_name = 'ss_voc_2007_trainval_output.mat'
     #extension = 'jpg'
     
-    label_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+    """
     img_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-    output_list = os.getcwd() + '/output/ss/imagenet_train_data_list.txt'
-    output_file_name = 'ss_imagenet_train_output.mat'
+    output_folder_type = 'train'
+    output_list = os.getcwd() + '/output/ss/train/imagenet_train_data_list.txt'
+    #output_file_name = 'ss_imagenet_train_output.mat'
+    output_file_name = 'ss_imagenet_train_output.pickle'
+    """
+    
+    img_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2013_DET_val'
+    output_folder_type = 'val'
+    output_list = os.getcwd() + '/output/ss/val/imagenet_val_data_list.txt'
+    output_file_name = 'ss_imagenet_val_output.mat'
+    #output_file_name = 'ss_imagenet_val_output.pickle'
+ 
     extension = 'JPEG'
     
     start_time = time.time()
     
-    create_target_file_list(label_folder, output_list)
+    multi_no = 10
+
+    output_dir = os.getcwd() + '/output/ss/' + output_folder_type
     
-    multi_no = 25
-
-    output_dir = os.getcwd() + '/output/ss'
-
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
+    create_target_file_list(img_folder, output_list)
+        
     call_external_ss(img_folder, output_list, output_dir, extension, multi_no, ss_exe, ss_path, output_file_name)
     
     print 'total time : %.0fs' % (time.time() - start_time)

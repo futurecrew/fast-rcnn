@@ -146,7 +146,7 @@ def get_predicted_boxes(cls_pred, box_deltas,
     scores = np.ascontiguousarray(box_info[:, 4])
     time1 = time.time()
     keep = nms_cpp(x1s, y1s, x2s, y2s, scores, nms_thres, max_cand_after_nms)
-    print 'nms_cpp %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
+    #print 'nms_cpp %s took %.3f sec. keep : %s' % (len(box_info), time.time() - time1, len(keep))
 
     """
     time1 = time.time()
