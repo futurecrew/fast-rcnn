@@ -302,6 +302,11 @@ def apply_nms(all_boxes, thresh):
 def test_net(net, imdb, proposal, proposal_file, output_dir):
     """Test a Fast R-CNN network on an image database."""
     num_images = len(imdb.image_index)
+    
+    # DJDJ
+    #num_images = 100
+    
+    
     # heuristic: keep an average of 40 detections per class per images prior
     # to NMS
     max_per_set = 40 * num_images

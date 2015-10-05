@@ -26,19 +26,24 @@ class imagenet(datasets.pascal_voc):
     def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
-        self._default_path = '/home/nvidia/www/data/ilsvrc14'
-        #self._default_path = 'E:/data/ilsvrc14'
+        #self._default_path = '/home/nvidia/www/data/ilsvrc14'
+        self._default_path = 'E:/data/ilsvrc14'
 
-        self._devkit_path = self._default_path if devkit_path is None \
-                            else devkit_path
+        self._devkit_path = self._default_path + '/ILSVRC2015_devkit'
         self._data_path = self._default_path
         
-        self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
-        self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
-        #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
-        #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
-        #self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
-        #self._image_path = self._data_path + '/ILSVRC2013_DET_val'
+        print 'image_set : %s' % image_set
+        
+        if image_set == 'train':
+            self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data'
+            self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+            #self._label_path = self._data_path + '/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_10000_data'
+            #self._image_path = self._data_path + '/ILSVRC2014_DET_train/ILSVRC2014_DET_train_10000_data'
+            #self._data_id_file = self._devkit_path + '/data/det_lists/train.txt'
+        elif image_set == 'val':
+            self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
+            self._image_path = self._data_path + '/ILSVRC2013_DET_val'
+            self._data_id_file = self._devkit_path + '/data/det_lists/val.txt'
         
         class_name_list_file = 'data/imagenet_det.txt'
         self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
@@ -48,7 +53,6 @@ class imagenet(datasets.pascal_voc):
         self._image_index = self._load_image_set_index()
         self._gt_roidb = None
         self.gt_roidb()
-        
         self.proposal_file = proposal_file
         
         # Default to roidb handler
@@ -340,47 +344,54 @@ class imagenet(datasets.pascal_voc):
         if use_salt:
             comp_id += '-{}'.format(os.getpid())
 
-        # VOCdevkit/results/VOC2007/Main/comp4-44503_det_test_aeroplane.txt
-        path = self._devkit_path + '/results'
+        # ilsvrc14/ILSVRC2015_devkit/results/resultscomp4-4520_det_val.txt
+        path = self._devkit_path + '/results/'
         if not os.path.exists(path):
             os.makedirs(path)
-            
+        
+        # read test data name, id mapping file
+        data_name_id_dict = {}
+        with open(self._data_id_file, 'r') as f:
+            for line in f.readlines():
+                name, id = line.split()
+                data_name_id_dict[name] = id                
+        
         print 'Writing imagenet results file'
         filename = path + comp_id + '_' + 'det_' + self._image_set + '.txt'
         with open(filename, 'wt') as f:
             for im_ind, index in enumerate(self.image_index):
+                
+                # DJDJ
+                #if im_ind > 99:
+                #    break
+                
                 for cls_ind, cls in enumerate(self.classes):
                     if cls == '__background__':
                         continue
-                dets = all_boxes[cls_ind][im_ind]
-                if dets == []:
-                    continue
-                # the VOCdevkit expects 1-based indices
-                for k in xrange(dets.shape[0]):
-                    f.write('{:s} {:s} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
-                            format(index, cls_ind, dets[k, -1],
-                                   dets[k, 0], dets[k, 1],
-                                   dets[k, 2], dets[k, 3]))
+                    
+                    dets = all_boxes[cls_ind][im_ind]
+                    if dets == []:
+                        continue
+                    
+                    index_id = data_name_id_dict[index]
+                    
+                    for k in xrange(dets.shape[0]):
+                        f.write('{:s} {:d} {:.3f} {:.1f} {:.1f} {:.1f} {:.1f}\n'.
+                                format(index_id, cls_ind, dets[k, -1],
+                                       dets[k, 0], dets[k, 1],
+                                       dets[k, 2], dets[k, 3]))
         return comp_id
 
     def _do_matlab_eval(self, comp_id, output_dir='output'):
         rm_results = self.config['cleanup']
 
         path = os.path.join(os.path.dirname(__file__),
-                            'Imagenet-devkit-matlab-wrapper')
-        """
-        cmd = 'cd {} && '.format(path)
-        cmd += '{:s} -nodisplay -nodesktop '.format(datasets.MATLAB)
-        cmd += '-r "dbstop if error; '
-        cmd += 'voc_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d}); quit;"' \
-               .format(self._devkit_path, comp_id,
-                       self._image_set, output_dir, int(rm_results))
-        """
+                            'Imagenetdevkit-matlab-wrapper')
         cmd = 'cd {} && '.format(path)
         cmd += '{:s} '.format(datasets.OCTAVE)
         cmd += '--eval '
         cmd += 'imagenet_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d})' \
-               .format(self._devkit_path, comp_id,
+               .format(self._devkit_path + '/evaluation', comp_id,
                        self._image_set, output_dir, int(rm_results))
 
         print('Running:\n{}'.format(cmd))
