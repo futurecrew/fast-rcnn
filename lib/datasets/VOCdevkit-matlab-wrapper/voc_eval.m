@@ -1,6 +1,9 @@
 function res = voc_eval(path, comp_id, test_set, output_dir, rm_res)
 
 % DJDJ
+warning ("off", "Octave:num-to-str");
+warning ("off", "Octave:possible-matlab-short-circuit-operator");
+
 %{
 path = 'E:/data/VOCdevkit2';
 comp_id = 'comp4-6060';
