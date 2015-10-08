@@ -27,7 +27,8 @@ class pascal_voc(datasets.imdb):
         datasets.imdb.__init__(self, 'voc_' + year + '_' + image_set)
         self._year = year
         self._image_set = image_set
-        self._devkit_path = self._get_default_path() if devkit_path is None \
+        self._default_path = '/home/dj/big/data/VOCdevkit'
+        self._devkit_path = self._default_path if devkit_path is None \
                             else devkit_path
         self._data_path = os.path.join(self._devkit_path, 'VOC' + self._year)
         self._classes = ('__background__', # always index 0
@@ -90,14 +91,6 @@ class pascal_voc(datasets.imdb):
         with open(image_set_file) as f:
             image_index = [x.strip() for x in f.readlines()]
         return image_index
-
-    def _get_default_path(self):
-        """
-        Return the default path where PASCAL VOC is expected to be installed.
-        """
-        # DJDJ
-        #return os.path.join(datasets.ROOT_DIR, 'data', 'VOCdevkit' + self._year)
-        return os.path.join('/home/nvidia/www/data/VOCdevkit')
 
     def gt_roidb(self):
         """
@@ -306,6 +299,7 @@ class pascal_voc(datasets.imdb):
         return {'boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
+                'label_file' : index + '.xml',
                 'flipped' : False}
 
     def _write_voc_results_file(self, all_boxes):
