@@ -2,14 +2,14 @@ import shutil
 from os import listdir
 from os.path import isfile
 
-src_dir = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data/'
-dest = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data/'
+src_dir = '/home/dj/data/ilsvrc14/ILSVRC2014_DET_bbox_train'
+dest = '/home/dj/data/ilsvrc14/ILSVRC2014_DET_bbox_train/ILSVRC2014_DET_bbox_train_all_data/'
 
 for f in listdir(src_dir):
     full_path = src_dir + '/' + f
     if isfile(full_path):
         continue
-    elif full_path == dest:
+    elif full_path + '/' == dest:
         continue
     
     #shutil.move(full_path + '/.', dest)

@@ -50,7 +50,7 @@ if [ "$step_1" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/rpn/solver.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use rpn --cfg experiments/cfgs/faster_rcnn_lazy.yml --iters $iters_rpn"
   echo $cmd
-  #$cmd
+  $cmd
   
   echo ""
   echo "----------------------------------------------------------------------------------"

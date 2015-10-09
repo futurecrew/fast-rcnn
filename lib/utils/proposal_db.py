@@ -1,6 +1,7 @@
 import os
 import leveldb
 import cPickle
+import scipy.io as sio
 
 def remove_folder( folder):
     if os.path.exists(folder) == False:
@@ -18,11 +19,27 @@ def gogo(input_proposal, output_db):
         print 'File not found %s' % input_proposal
         return
     
-    with open(input_proposal, 'r') as f:
-        file_list = cPickle.load(f)
-        box_list = cPickle.load(f)
-        
-    print 'finished reading the pickle file.'
+    print 'reading input data file : %s' % input_proposal
+    if '.pkl' in input_proposal:
+        with open(input_proposal, 'r') as f:
+            file_list = cPickle.load(f)
+            box_list = cPickle.load(f)
+        print 'finished reading the pickle file.'
+    elif '.mat' in input_proposal:
+        matlab_data = sio.loadmat(input_proposal)
+        raw_file_data = matlab_data['images'].ravel()
+        raw_box_data = matlab_data['boxes'].ravel()
+        file_list = []
+        for i in xrange(raw_file_data.shape[0]):
+            file_list.append(raw_file_data[i][0].encode('ascii', 'ignore'))
+        box_list = []
+        for i in xrange(raw_box_data.shape[0]):
+            box_list.append(raw_box_data[i][:, (1, 0, 3, 2)] - 1)
+        print 'finished reading the mat file.'
+    else:
+        print 'unsupported file format.'
+        print '.pkl and .mat files are supported.'
+        return
 
     remove_folder(output_db)
     
@@ -43,7 +60,7 @@ def gogo(input_proposal, output_db):
         db.Write(batch, sync = True)
 
     print 'inserted total %s data into db' % i
-    print 'finished writing DB.'
+    print 'finished writing DB : %s' % output_db
             
 def read_data(input_db):
     db = leveldb.LevelDB(input_db)
@@ -55,9 +72,10 @@ def read_data(input_db):
 
 if __name__ == '__main__':
     #input_proposal = 'E:/project/fast-rcnn/output/rpn_data/imagenet_val/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
-    input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
+    #input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
     #input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_val/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
-    output_db = input_proposal.split('.pkl')[0] + '_db'
+    input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
+    output_db = input_proposal.split('.')[0] + '_db'
     
     gogo(input_proposal, output_db)
-    read_data(output_db)    
+    #read_data(output_db)    

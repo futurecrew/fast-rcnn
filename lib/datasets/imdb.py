@@ -115,14 +115,14 @@ class imdb(object):
         widths = [PIL.Image.open(self.image_path_at(i)).size[0]
                   for i in xrange(num_images)]
         for i in xrange(num_images):
-            boxes = self.roidb[i]['boxes'].copy()
+            boxes = self.roidb[i]['gt_boxes'].copy()
             oldx1 = boxes[:, 0].copy()
             oldx2 = boxes[:, 2].copy()
             boxes[:, 0] = widths[i] - oldx2 - 1
             boxes[:, 2] = widths[i] - oldx1 - 1
             
             assert (boxes[:, 2] >= boxes[:, 0]).all()
-            entry = {'boxes' : boxes,
+            entry = {'gt_boxes' : boxes,
                      'gt_overlaps' : self.roidb[i]['gt_overlaps'],
                      'gt_classes' : self.roidb[i]['gt_classes'],
                      'flipped' : True}
@@ -174,6 +174,7 @@ class imdb(object):
         assert len(box_list) == self.num_images, \
                 'Number of boxes must match number of ground-truth images. %s vs. %s' % (len(box_list), self.num_images)
         roidb = []
+        print 'create_roidb_from_box_list() start'
         for i in xrange(self.num_images):
             max_proposal_box = cfg.MAX_PROPOSAL_NO
             boxes = box_list[i][:max_proposal_box]
@@ -181,7 +182,7 @@ class imdb(object):
             overlaps = np.zeros((num_boxes, self.num_classes), dtype=np.float32)
 
             if gt_roidb is not None:
-                gt_boxes = gt_roidb[i]['boxes']
+                gt_boxes = gt_roidb[i]['gt_boxes']
                 gt_classes = gt_roidb[i]['gt_classes']
                 gt_overlaps = bbox_overlaps(boxes.astype(np.float),
                                             gt_boxes.astype(np.float))
@@ -196,17 +197,20 @@ class imdb(object):
                                                   dtype=np.int32),
                           'gt_overlaps' : overlaps,
                           'flipped' : False})
+        print 'create_roidb_from_box_list() end'
         return roidb
 
     @staticmethod
     def merge_roidbs(a, b):
         assert len(a) == len(b)
+        print 'merge_roidbs() start'
         for i in xrange(len(a)):
-            a[i]['boxes'] = np.vstack((a[i]['boxes'], b[i]['boxes']))
+            a[i]['boxes'] = np.vstack((a[i]['gt_boxes'], b[i]['boxes']))
             a[i]['gt_classes'] = np.hstack((a[i]['gt_classes'],
                                             b[i]['gt_classes']))
             a[i]['gt_overlaps'] = scipy.sparse.vstack([a[i]['gt_overlaps'],
                                                        b[i]['gt_overlaps']])
+        print 'merge_roidbs() end'
         return a
 
     def competition_mode(self, on):

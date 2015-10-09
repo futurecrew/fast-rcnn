@@ -46,8 +46,8 @@ class pascal_voc(datasets.imdb):
         # Default to roidb handler
         if model_to_use == 'rpn':           # Step 1, 3
             self._roidb_handler = self.rpn_train_roidb
-        elif model_to_use == 'frcnn':
-            if proposal == 'rpn':           # Step 2, 4
+        elif model_to_use == 'frcnn':     
+            if proposal == 'rpn':           # Step 2, 4  
                 self._roidb_handler = self.rpn_proposal_roidb
             elif proposal == 'ss':
                 self._roidb_handler = self.selective_search_roidb
@@ -151,9 +151,6 @@ class pascal_voc(datasets.imdb):
         assert os.path.exists(filename), \
                'Selective search data not found at: {}'.format(filename)
         raw_data = sio.loadmat(filename)['boxes'].ravel()
-
-        # DJDJ
-        #raw_data = raw_data[:150, ]
 
         box_list = []
         for i in xrange(raw_data.shape[0]):
@@ -296,7 +293,7 @@ class pascal_voc(datasets.imdb):
 
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
-        return {'boxes' : boxes,
+        return {'gt_boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
                 'label_file' : index + '.xml',
@@ -334,7 +331,7 @@ class pascal_voc(datasets.imdb):
 
         path = os.path.join(os.path.dirname(__file__),
                             'VOCdevkit-matlab-wrapper')
-        """
+
         cmd = 'cd {} && '.format(path)
         cmd += '{:s} -nodisplay -nodesktop '.format(datasets.MATLAB)
         cmd += '-r "dbstop if error; '
@@ -347,7 +344,7 @@ class pascal_voc(datasets.imdb):
         cmd += 'voc_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d}); quit;"' \
                .format(self._devkit_path, comp_id,
                        self._image_set, output_dir, int(rm_results))
-        
+        """
         print('Running:\n{}'.format(cmd))
         
         status = subprocess.call(cmd, shell=True)

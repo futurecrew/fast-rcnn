@@ -73,6 +73,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
         p.start()
 
     end_gpu_no = 0
+    total_file_list_to_save = []
     total_box_list_to_save = []
     while True:
         queue_data = queue_gpu_to_main.get()
@@ -88,12 +89,13 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     total_no_found = 0
             
     for gpu_id in gpu_id_list:
-        file = proposal_folder + '/gpu_result_' + str(gpu_id) + '.pickle'
+        file = proposal_folder + '/gpu_result_' + str(gpu_id) + '.pkl'
         with open(file, 'rb') as fid:
             dump_data = cPickle.load(fid)
             print 'read pickled data : %s' % file
             total_no_to_find += dump_data['total_no_to_find']
             total_no_found += dump_data['total_no_found']
+            total_file_list_to_save.extend(dump_data['file_list_to_save'])
             total_box_list_to_save.extend(dump_data['box_list_to_save'])
 
 
@@ -105,6 +107,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     proposal_file = proposal_folder + '/' + model_name + '_' + step + '_rpn_top_' + str(MAX_CAND_AFTER_NMS) + '_candidate.pkl'
 
     with open(proposal_file, 'wb') as fid:
+        cPickle.dump(total_file_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
         cPickle.dump(total_box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
     print 'wrote rpn roidb to {}'.format(proposal_file)            
     
@@ -122,6 +125,7 @@ def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
     
     process_list = []
+    total_file_list_to_save = []
     total_box_list_to_save = []
     queue_child_to_gpu = Queue()
     queue_gpu_to_child_list = []
@@ -178,6 +182,7 @@ def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
             if ret_value['pid'] == i:
                 total_no_to_find += ret_value['total_no_to_find']
                 total_no_found += ret_value['total_no_found']
+                total_file_list_to_save.extend(ret_value['file_list_to_save'])
                 total_box_list_to_save.extend(ret_value['box_list_to_save'])
                 break
 
@@ -188,9 +193,10 @@ def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
     dump_data['gpuid'] = gpuid
     dump_data['total_no_to_find'] = total_no_to_find
     dump_data['total_no_found'] = total_no_found
+    dump_data['file_list_to_save'] = total_file_list_to_save
     dump_data['box_list_to_save'] = total_box_list_to_save
             
-    proposal_file = proposal_folder + '/gpu_result_' + str(gpuid) + '.pickle'
+    proposal_file = proposal_folder + '/gpu_result_' + str(gpuid) + '.pkl'
     with open(proposal_file, 'wb') as fid:
         cPickle.dump(dump_data, fid, cPickle.HIGHEST_PROTOCOL)
     print 'wrote rpn proposal gpu %s to %s' % (gpuid, proposal_file)            
@@ -205,6 +211,7 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
     no = 0
     total_no_to_find = 0
     total_no_found = 0
+    file_list_to_save = []
     box_list_to_save = []
     
     print 'starting child process %s' % pid
@@ -219,7 +226,7 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
 
         no += 1
         
-        gt_boxes = gtdb[no-1]['boxes']
+        gt_boxes = gtdb[no-1]['gt_boxes']
             
         # if there is no ground truth then ignore this image
         if len(gt_boxes) == 0:
@@ -230,7 +237,7 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
         #if file_name != '000009':
         #    continue
         
-        #print 'data file : %s' % (data_folder + '/' + file_name)
+        #print 'data file : %s' % (data_folder + '/' + file_name + '.' + data_ext)
         
         im = cv2.imread(data_folder + '/' + file_name + '.' + data_ext)
         
@@ -306,12 +313,14 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
         assert (pred_boxes[:, 2] >= pred_boxes[:, 0]).all()
         assert (pred_boxes[:, 3] >= pred_boxes[:, 1]).all()
                     
+        file_list_to_save.append(file_name)
         box_list_to_save.append(pred_boxes.astype(np.int16))
 
     queue_data = {}
     queue_data['pid'] = pid
     queue_data['total_no_to_find'] = total_no_to_find
     queue_data['total_no_found'] = total_no_found
+    queue_data['file_list_to_save'] = file_list_to_save
     queue_data['box_list_to_save'] = box_list_to_save
     queue_child_to_gpu.put(queue_data)    
 
@@ -456,7 +465,7 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    MULTI_CPU_NO = 3
+    MULTI_CPU_NO = 10
     
     args = parse_args()
 
@@ -487,29 +496,51 @@ if __name__ == '__main__':
     data_folder = args.data_folder
     data_ext = args.data_ext
     
-
     if 'voc_2007' in args.imdb_name:
         if args.data_type == 'trainval':
             gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
-            data_list = '/home/nvidia/www/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+            data_list = '/home/dj/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
             test_data = 'voc_2007_trainval'
         elif args.data_type == 'test':
             gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
-            data_list = '/home/nvidia/www/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+            data_list = '/home/dj/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
             test_data = 'voc_2007_test'
-        data_folder = '/home/nvidia/www/data/VOCdevkit/VOC2007/JPEGImages/'
+        data_folder = '/home/dj/data/VOCdevkit/VOC2007/JPEGImages/'
         data_ext = 'jpg'
     elif 'imagenet' in args.imdb_name:
         if args.data_type == 'train' or args.data_type == 'trainval' :
             gt = 'data/cache/imagenet_train_gt_roidb.pkl'
-            data_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+            data_folder = '/home/dj/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
             test_data = 'imagenet_train'
         elif args.data_type == 'test':
             gt = 'data/cache/imagenet_val_gt_roidb.pkl'
-            data_folder = '/home/nvidia/www/data/ilsvrc14/ILSVRC2013_DET_val'
+            data_folder = '/home/dj/data/ilsvrc14/ILSVRC2013_DET_val'
             test_data = 'imagenet_val'            
         data_ext = 'JPEG'
-            
+    """
+    if 'voc_2007' in args.imdb_name:
+        if args.data_type == 'trainval':
+            gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
+            data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+            test_data = 'voc_2007_trainval'
+        elif args.data_type == 'test':
+            gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
+            data_list = 'E:/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+            test_data = 'voc_2007_test'
+        data_folder = 'E:/data/VOCdevkit/VOC2007/JPEGImages/'
+        data_ext = 'jpg'
+    elif 'imagenet' in args.imdb_name:
+        if args.data_type == 'train' or args.data_type == 'trainval' :
+            gt = 'data/cache/imagenet_train_gt_roidb.pkl'
+            data_folder = 'E:/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
+            test_data = 'imagenet_train'
+        elif args.data_type == 'test':
+            gt = 'data/cache/imagenet_val_gt_roidb.pkl'
+            data_folder = 'E:/data/ilsvrc14/ILSVRC2013_DET_val'
+            test_data = 'imagenet_val'            
+        data_ext = 'JPEG'
+    """
+    
     print 'using gt : %s' % gt
     
 

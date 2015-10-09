@@ -20,28 +20,60 @@ import cv2
 from utils.cython_bbox import bbox_overlaps
 from utils.blob import im_scale_after_resize
 from utils.model import last_conv_size
+import leveldb
 
 anchors = [[128*2, 128*1], [128*1, 128*1], [128*1, 128*2], 
            [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
            [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]]
 
-def prepare_one_roidb_frcnn(roidb):
+candidiate_db = None
+
+def prepare_one_roidb_frcnn(roidb, proposal_file, num_classes):
     """Enrich the imdb's roidb by adding some derived quantities that
     are useful for training. This function precomputes the maximum
     overlap, taken over ground-truth boxes, between each ROI and
     each ground-truth box. The class with maximum overlap is also
     recorded.
     """
-    # need gt_overlaps as a dense array for argmax
-    gt_overlaps = roidb['gt_overlaps'].toarray()
+    
+    global candidiate_db
+    if candidiate_db == None and proposal_file != None:
+        candidiate_db = leveldb.LevelDB(proposal_file)
+        
+    max_proposal_box = cfg.MAX_PROPOSAL_NO
+    roi_image = roidb['image'].split('/')[-1].split('.')[0]
+    boxes = candidiate_db.Get(roi_image)
+    boxes = cPickle.loads(boxes)
+    boxes = boxes[:max_proposal_box]
+
+    gt_boxes = roidb['gt_boxes']
+    gt_classes = roidb['gt_classes']
+    
+    boxes = np.vstack((gt_boxes, boxes))
+
+    num_boxes = boxes.shape[0]
+    overlaps = np.zeros((num_boxes, num_classes), dtype=np.float32)
+    
+    bbox_gt_overlaps = bbox_overlaps(boxes.astype(np.float),
+                                gt_boxes.astype(np.float))
+    argmaxes = bbox_gt_overlaps.argmax(axis=1)
+    maxes = bbox_gt_overlaps.max(axis=1)
+    I = np.where(maxes > 0)[0]
+    overlaps[I, gt_classes[argmaxes[I]]] = maxes[I]
+    
+    roidb['boxes'] = boxes
+    #roidb['gt_classes'] = np.zeros((num_boxes,), dtype=np.int32)
+    roidb['gt_overlaps'] = overlaps,
+    roidb['flipped'] = False
+    
+    
+    gt_overlaps = overlaps
     # max overlap with gt over classes (columns)
     max_overlaps = gt_overlaps.max(axis=1)
     # gt class that had the max overlap
     max_classes = gt_overlaps.argmax(axis=1)
-
-    rois = roidb['boxes']
                 
-    bbox_targets = _compute_targets(rois, max_overlaps, max_classes)
+    bbox_targets = _compute_targets(boxes, max_overlaps, max_classes)
     
     roidb['max_classes'] = max_classes
     roidb['bbox_targets'] = bbox_targets
@@ -53,10 +85,9 @@ def prepare_one_roidb_frcnn(roidb):
     assert all(max_classes[zero_inds] == 0)
     # max overlap > 0 => class should not be zero (must be a fg class)
     nonzero_inds = np.where(max_overlaps > 0)[0]
-    assert all(max_classes[nonzero_inds] != 0)
 
 def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_scale):
-    gt_boxes = roidb['boxes']
+    gt_boxes = roidb['gt_boxes']
     gt_classes = roidb['gt_classes']
 
     conv_height, scale_height = last_conv_size(resized_im_height, cfg.MODEL_NAME)
@@ -168,7 +199,7 @@ def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_sca
     #nonzero_inds = np.where(max_overlaps > 0)[0]
     #assert all(max_classes[nonzero_inds] != 0)    
 
-def prepare_roidb(imdb, model_to_use):
+def prepare_roidb(imdb, model_to_use, proposal_file):
     """Enrich the imdb's roidb by adding some derived quantities that
     are useful for training. This function precomputes the maximum
     overlap, taken over ground-truth boxes, between each ROI and
@@ -214,11 +245,6 @@ def prepare_roidb(imdb, model_to_use):
     print 'len(imdb.image_index) : %s' % len(imdb.image_index)
 
     for i in xrange(len(imdb.image_index)):
-        
-        # DJDJ
-        #if i < 329700:
-        #    continue
-        
         image_path = imdb.image_path_at(i)
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
@@ -241,7 +267,7 @@ def prepare_roidb(imdb, model_to_use):
                 bbox_squared_sums[0, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
 
         elif model_to_use == 'frcnn':
-            prepare_one_roidb_frcnn(roidb[i])
+            prepare_one_roidb_frcnn(roidb[i], proposal_file, num_classes)
             
             bbox_targets = roidb[i]['bbox_targets']
             for cls in xrange(1, num_classes):
@@ -254,10 +280,7 @@ def prepare_roidb(imdb, model_to_use):
         # Erase memory in case of LAZY_PREPARING_ROIDB not to use memory
         # max_classes and bbox_targets will be calculated again in minibatch
         if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
-            roidb[i]['max_classes'] = None
-            roidb[i]['bbox_targets'] = None
-            if 'max_overlaps' in roidb[i]:
-                roidb[i]['max_overlaps'] = None
+            clear_one_roidb(roidb[i])
             
         if i % 100 == 0:
             print 'processing image %s' % i
@@ -279,7 +302,16 @@ def prepare_roidb(imdb, model_to_use):
         cPickle.dump(imdb.roidb, fid, cPickle.HIGHEST_PROTOCOL)
     print 'wrote roidb to {}'.format(cache_file_roidb)
 
-            
+def clear_one_roidb(roidb):
+    roidb['max_classes'] = None
+    roidb['bbox_targets'] = None
+    if 'max_overlaps' in roidb:
+        roidb['max_overlaps'] = None
+    if 'boxes' in roidb:
+        roidb['boxes'] = None
+    if 'gt_overlaps' in roidb:
+        roidb['gt_overlaps'] = None
+                
 def add_bbox_regression_targets(roidb, model_to_use):
     """Add information needed to train bounding-box regressors."""
     assert len(roidb) > 0

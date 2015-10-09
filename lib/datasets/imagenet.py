@@ -26,8 +26,8 @@ class imagenet(datasets.pascal_voc):
     def __init__(self, image_set, model_to_use='frcnn', proposal='ss', proposal_file='', devkit_path=None):
         datasets.imdb.__init__(self, 'imagenet_' + image_set)
         self._image_set = image_set
-        #self._default_path = '/home/nvidia/www/data/ilsvrc14'
-        self._default_path = 'E:/data/ilsvrc14'
+        self._default_path = '/home/dj/data/ilsvrc14'
+        #self._default_path = 'E:/data/ilsvrc14'
 
         self._devkit_path = self._default_path + '/ILSVRC2015_devkit'
         self._data_path = self._default_path
@@ -253,11 +253,7 @@ class imagenet(datasets.pascal_voc):
         Return the database of rpn regions of interest.
         Ground-truth ROIs are also included.
         """
-        gt_roidb = self.gt_roidb()
-            
-        roidb = gt_roidb
-
-        return roidb
+        return self.gt_roidb()
 
     def rpn_proposal_roidb(self):
         """
@@ -266,19 +262,18 @@ class imagenet(datasets.pascal_voc):
         """
         
         gt_roidb = self.gt_roidb()
-        
-        roidb = gt_roidb
-        
-        rpn_roidb = self._load_rpn_roidb(gt_roidb)
-        roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
-        
-        return roidb
+        return gt_roidb
+    
+        #rpn_roidb = self._load_rpn_roidb(gt_roidb)
+        #roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)        
+        #return roidb
     
     def _load_rpn_roidb(self, gt_roidb):
         filename = os.path.abspath(self.proposal_file)
         assert os.path.exists(filename), \
                'RPN data not found at: {}'.format(filename)
         with open(filename, 'rb') as fid:
+            file_list = cPickle.load(fid)
             box_list = cPickle.load(fid)
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)
@@ -331,7 +326,7 @@ class imagenet(datasets.pascal_voc):
         
         overlaps = scipy.sparse.csr_matrix(overlaps)
 
-        return {'boxes' : boxes,
+        return {'gt_boxes' : boxes,
                 'gt_classes': gt_classes,
                 'gt_overlaps' : overlaps,
                 'label_file' : label_file,

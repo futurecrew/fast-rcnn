@@ -132,12 +132,13 @@ if __name__ == '__main__':
     # DJDJ
     #imdb.rpn_train_roidb()
     
-    roidb = get_training_roidb(imdb, args.model_to_use)
+    roidb = get_training_roidb(imdb, args.model_to_use, args.proposal_file)
 
     output_dir = get_output_dir(imdb, None)
     print 'Output will be saved to `{:s}`'.format(output_dir)
 
     train_net(args.solver, imdb.bbox_means, imdb.bbox_stds, roidb, output_dir,
+              proposal_file,
               pretrained_model=args.pretrained_model,
               restore=args.restore,
               max_iters=args.max_iters,

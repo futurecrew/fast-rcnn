@@ -14,8 +14,9 @@ from fast_rcnn.config import cfg
 from utils.blob import prep_im_for_blob, im_list_to_blob
 from utils.model import last_conv_size
 from roi_data_layer.roidb import prepare_one_roidb_rpn, prepare_one_roidb_frcnn
+from roidb import clear_one_roidb
 
-def get_minibatch(roidb, num_classes, bbox_means, bbox_stds):
+def get_minibatch(roidb, num_classes, bbox_means, bbox_stds, proposal_file):
     """Given a roidb, construct a minibatch sampled from it."""
     num_images = len(roidb)
     # Sample random scales to use for each image in this batch
@@ -83,11 +84,11 @@ def get_minibatch(roidb, num_classes, bbox_means, bbox_stds):
         labels_blob = np.zeros((0), dtype=np.float32)
         bbox_targets_blob = np.zeros((0, 4 * num_classes), dtype=np.float32)
         bbox_loss_blob = np.zeros(bbox_targets_blob.shape, dtype=np.float32)
-        # all_overlaps = []
+        all_overlaps = []
         for im_i in xrange(num_images):
             
             if cfg.TRAIN.LAZY_PREPARING_ROIDB:
-                prepare_one_roidb_frcnn(roidb[im_i])
+                prepare_one_roidb_frcnn(roidb[im_i], proposal_file, num_classes)
                 
             # Normalize bbox_targets
             if cfg.TRAIN.NORMALIZE_BBOX:
@@ -111,10 +112,10 @@ def get_minibatch(roidb, num_classes, bbox_means, bbox_stds):
             labels_blob = np.hstack((labels_blob, labels))
             bbox_targets_blob = np.vstack((bbox_targets_blob, bbox_targets))
             bbox_loss_blob = np.vstack((bbox_loss_blob, bbox_loss))
-            # all_overlaps = np.hstack((all_overlaps, overlaps))
+            #all_overlaps = np.hstack((all_overlaps, overlaps))
         
         # For debug visualizations
-        # _vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
+        #_vis_minibatch(im_blob, rois_blob, labels_blob, all_overlaps)
     
         blobs = {'data': im_blob,
                  'rois': rois_blob,
@@ -129,8 +130,7 @@ def get_minibatch(roidb, num_classes, bbox_means, bbox_stds):
 def clear_minibatch(roidb):
     num_images = len(roidb)
     for im_i in xrange(num_images):
-        roidb[im_i]['max_classes'] = None
-        roidb[im_i]['bbox_targets'] = None    
+        clear_one_roidb(roidb[im_i])
     
 def _sample_rois(roidb, fg_rois_per_image, rois_per_image, num_classes):
     """Generate a random sample of RoIs comprising foreground and background

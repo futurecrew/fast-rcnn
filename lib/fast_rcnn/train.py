@@ -24,6 +24,7 @@ class SolverWrapper(object):
     """
 
     def __init__(self, solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
+                 proposal_file,
                  pretrained_model=None, restore=None, model_to_use='frcnn', proposal='ss'):
         """Initialize the SolverWrapper."""
         self.output_dir = output_dir
@@ -35,6 +36,7 @@ class SolverWrapper(object):
 
         self.bbox_means = bbox_means
         self.bbox_stds = bbox_stds
+        self.proposal_file = proposal_file
                 
         """
         if cfg.TRAIN.LAZY_PREPARING_ROIDB == False:        
@@ -94,7 +96,7 @@ class SolverWrapper(object):
         with open(solver_prototxt, 'rt') as f:
             pb2.text_format.Merge(f.read(), self.solver_param)
 
-        self.solver.net.layers[0].set_roidb(roidb, bbox_means, bbox_stds)
+        self.solver.net.layers[0].set_roidb(roidb, bbox_means, bbox_stds, proposal_file)
         
     def snapshot(self):
         """Take a snapshot of the network after unnormalizing the learned
@@ -180,7 +182,7 @@ class SolverWrapper(object):
         if last_snapshot_iter != self.solver.iter:
             self.snapshot()
 
-def get_training_roidb(imdb, model_to_use):
+def get_training_roidb(imdb, model_to_use, proposal_file):
     """Returns a roidb (Region of Interest database) for use in training."""
     if cfg.TRAIN.USE_FLIPPED:
         print 'Appending horizontally-flipped training examples...'
@@ -188,16 +190,18 @@ def get_training_roidb(imdb, model_to_use):
         print 'done'
 
     print 'Preparing training data...'
-    rdl_roidb.prepare_roidb(imdb, model_to_use)
+    rdl_roidb.prepare_roidb(imdb, model_to_use, proposal_file)
     print 'done'
 
     return imdb.roidb
 
 def train_net(solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
+              proposal_file,
               pretrained_model=None, restore=None, max_iters=40000,
               model_to_use='frcnn', proposal='ss'):
     """Train a Fast R-CNN network."""
     sw = SolverWrapper(solver_prototxt, bbox_means, bbox_stds, roidb, output_dir,
+                       proposal_file,
                        pretrained_model=pretrained_model,
                        restore=restore,
                        model_to_use=model_to_use,
