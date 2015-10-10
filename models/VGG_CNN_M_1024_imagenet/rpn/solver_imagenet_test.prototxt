@@ -17,5 +17,5 @@ weight_decay: 0.0005
 # function
 snapshot: 0
 # We still use the snapshot prefix, though
-snapshot_prefix: "VGG_CNN_M_1024_imagenet_rpn"
+snapshot_prefix: "vgg_cnn_m_1024_imagenet_rpn"
 #debug_info: true

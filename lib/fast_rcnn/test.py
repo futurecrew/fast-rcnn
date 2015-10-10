@@ -19,6 +19,7 @@ import heapq
 from utils.blob import im_list_to_blob
 import os
 import os.path as osp
+import leveldb
 
 def _get_image_blob(im):
     """Converts an image into a network input.
@@ -332,6 +333,8 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    candidiate_db = leveldb.LevelDB(proposal_file)
+
     # timers
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
 
@@ -339,15 +342,21 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
     for i in xrange(num_images):
         im = cv2.imread(imdb.image_path_at(i))
         _t['im_detect'].tic()
-        scores, boxes = im_detect(net, im, roidb[i]['boxes'])
+
+        proposals = candidiate_db.Get(roidb[i]['label_file'].split('.')[0])
+        proposals = cPickle.loads(proposals)
+        
+        scores, boxes = im_detect(net, im, proposals)
         _t['im_detect'].toc()
 
         _t['misc'].tic()
         for j in xrange(1, imdb.num_classes):
-            inds = np.where((scores[:, j] > thresh[j]) &
-                            (roidb[i]['gt_classes'] == 0))[0]
-            cls_scores = scores[inds, j]
-            cls_boxes = boxes[inds, j*4:(j+1)*4]
+            #inds = np.where((scores[:, j] > thresh[j]) &
+            #               (roidb[i]['gt_classes'] == 0))[0]
+            #cls_scores = scores[inds, j]
+            #cls_boxes = boxes[inds, j*4:(j+1)*4]
+            cls_scores = scores[:, j]
+            cls_boxes = boxes[:, j*4:(j+1)*4]
             top_inds = np.argsort(-cls_scores)[:max_per_image]
             cls_scores = cls_scores[top_inds]
             cls_boxes = cls_boxes[top_inds, :]

@@ -254,6 +254,7 @@ class pascal_voc(datasets.imdb):
         assert os.path.exists(filename), \
                'RPN data not found at: {}'.format(filename)
         with open(filename, 'rb') as fid:
+            file_list = cPickle.load(fid)
             box_list = cPickle.load(fid)
 
         return self.create_roidb_from_box_list(box_list, gt_roidb)

@@ -17,7 +17,7 @@ ROOT_DIR = osp.join(osp.dirname(__file__), '..', '..')
 # If either is not true, just add it to your path and alias it as matlab, or
 # you could change this file.
 
-#MATLAB = 'matlab'
+MATLAB = 'matlab'
 #MATLAB = 'matlab.exe'
 OCTAVE = 'octave'
 

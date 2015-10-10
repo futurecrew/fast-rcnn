@@ -14,7 +14,7 @@ def remove_folder( folder):
             os.rmdir(os.path.join(root, name))
 
 
-def gogo(input_proposal, output_db):
+def make_db(input_proposal, output_db):
     if os.path.isfile(input_proposal) == False:
         print 'File not found %s' % input_proposal
         return
@@ -51,7 +51,7 @@ def gogo(input_proposal, output_db):
         batch.Put(file, cPickle.dumps(box))
         i += 1
         if i % 5000 == 0:
-            print 'inserted %s data into db' % i
+            print 'inserted %s data into DB' % i
             db.Write(batch, sync = True)
             del batch
             batch = leveldb.WriteBatch()
@@ -59,7 +59,7 @@ def gogo(input_proposal, output_db):
     if i % 5000 > 0:
         db.Write(batch, sync = True)
 
-    print 'inserted total %s data into db' % i
+    print 'inserted total %s data into DB' % i
     print 'finished writing DB : %s' % output_db
             
 def read_data(input_db):
@@ -77,5 +77,5 @@ if __name__ == '__main__':
     input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
     output_db = input_proposal.split('.')[0] + '_db'
     
-    gogo(input_proposal, output_db)
+    make_db(input_proposal, output_db)
     #read_data(output_db)    

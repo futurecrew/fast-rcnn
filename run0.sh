@@ -70,7 +70,7 @@ if [ "$step_2" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   echo "Step 2 : Train FRCNN based on imagenet pre-trained model with step 1 RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step2.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_1_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
+  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step2.prototxt --weights data/imagenet_models/$model.v2.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_1_rpn_top_2300_candidate_db --iters $iters_frcnn"
   echo $cmd
   $cmd
 fi
@@ -106,7 +106,7 @@ if [ "$step_4" == "true" ]; then
   echo "----------------------------------------------------------------------------------"
   echo "Step 4 : Train FRCNN based on step 2 FRCNN with step 3 RPN proposals"
   echo "----------------------------------------------------------------------------------"
-  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step4.prototxt --weights output/fast_rcnn_lazy/${imdb}_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_3_rpn_top_2300_candidate.pkl --iters $iters_frcnn"
+  cmd="tools/train_net.py --gpu $gpu --imdb $imdb --solver models/$model/solver_step4.prototxt --weights output/fast_rcnn_lazy/${imdb}_with_rpn/${model_L}_fast_rcnn_step2_with_rpn_iter_$iters_frcnn.caffemodel --model_to_use frcnn --cfg experiments/cfgs/fast_rcnn_lazy.yml --proposal rpn --proposal_file=output/rpn_data/${imdb}/${model_L}_step_3_rpn_top_2300_candidate_db --iters $iters_frcnn"
   echo $cmd
   $cmd
 fi

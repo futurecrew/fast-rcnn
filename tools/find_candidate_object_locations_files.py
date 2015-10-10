@@ -24,6 +24,7 @@ from utils.box_prediction import get_predicted_boxes
 from caffe import nms_cpp
 from caffe import nms_cuda
 from util import prevent_sleep
+from utils.proposal_db import make_db
 
 
 def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
@@ -109,7 +110,10 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     with open(proposal_file, 'wb') as fid:
         cPickle.dump(total_file_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
         cPickle.dump(total_box_list_to_save, fid, cPickle.HIGHEST_PROTOCOL)
-    print 'wrote rpn roidb to {}'.format(proposal_file)            
+    print 'wrote rpn roidb to {}'.format(proposal_file)
+    
+    print 'converting proposal pickle into DB'
+    make_db(proposal_file, proposal_file.split('.')[0] + '_db')
     
         
 def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
@@ -499,13 +503,13 @@ if __name__ == '__main__':
     if 'voc_2007' in args.imdb_name:
         if args.data_type == 'trainval':
             gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
-            data_list = '/home/dj/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
+            data_list = '/home/dj/big/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'
             test_data = 'voc_2007_trainval'
         elif args.data_type == 'test':
             gt = 'data/cache/voc_2007_test_gt_roidb.pkl'
-            data_list = '/home/dj/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
+            data_list = '/home/dj/big/data/VOCdevkit/VOC2007/ImageSets/Main/test.txt'
             test_data = 'voc_2007_test'
-        data_folder = '/home/dj/data/VOCdevkit/VOC2007/JPEGImages/'
+        data_folder = '/home/dj/big/data/VOCdevkit/VOC2007/JPEGImages/'
         data_ext = 'jpg'
     elif 'imagenet' in args.imdb_name:
         if args.data_type == 'train' or args.data_type == 'trainval' :
