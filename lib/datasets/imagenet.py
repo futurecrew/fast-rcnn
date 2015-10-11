@@ -44,9 +44,13 @@ class imagenet(datasets.pascal_voc):
             self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
             self._image_path = self._data_path + '/ILSVRC2013_DET_val'
             self._data_id_file = self._devkit_path + '/data/det_lists/val.txt'
+        elif image_set == 'val_2000':
+            self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
+            self._image_path = self._data_path + '/ILSVRC2013_DET_val'
+            self._data_id_file = self._devkit_path + '/data/det_lists/val_2000.txt'
         
         class_name_list_file = 'data/imagenet_det.txt'
-        self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2014_devkit/data/meta_det.mat',
+        self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2015_devkit/data/meta_det.mat',
                                                class_name_list_file)
         self._class_to_ind = dict(zip(self.classes, xrange(self.num_classes)))
         self._image_ext = '.JPEG'
@@ -111,7 +115,7 @@ class imagenet(datasets.pascal_voc):
             for label_file in os.listdir(self._label_path):
                 image_index.append(label_file[:-4])
         else:
-            image_set_file = os.path.join(self._data_path, 'ILSVRC2014_devkit/data/det_lists',
+            image_set_file = os.path.join(self._data_path, 'ILSVRC2015_devkit/data/det_lists',
                                           self._image_set + '.txt')
             assert os.path.exists(image_set_file), \
                     'Path does not exist: {}'.format(image_set_file)
@@ -355,11 +359,6 @@ class imagenet(datasets.pascal_voc):
         filename = path + comp_id + '_' + 'det_' + self._image_set + '.txt'
         with open(filename, 'wt') as f:
             for im_ind, index in enumerate(self.image_index):
-                
-                # DJDJ
-                #if im_ind > 99:
-                #    break
-                
                 for cls_ind, cls in enumerate(self.classes):
                     if cls == '__background__':
                         continue
@@ -382,13 +381,23 @@ class imagenet(datasets.pascal_voc):
 
         path = os.path.join(os.path.dirname(__file__),
                             'Imagenetdevkit-matlab-wrapper')
+
+        cmd = 'cd {} && '.format(path)
+        cmd += '{:s} -nodisplay -nodesktop '.format(datasets.MATLAB)
+        cmd += '-r "dbstop if error; '
+        cmd += 'imagenet_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d}); quit;"' \
+               .format(self._devkit_path + '/evaluation', comp_id,
+                       self._image_set, output_dir, int(rm_results))
+
+        """
         cmd = 'cd {} && '.format(path)
         cmd += '{:s} '.format(datasets.OCTAVE)
         cmd += '--eval '
         cmd += 'imagenet_eval(\'{:s}\',\'{:s}\',\'{:s}\',\'{:s}\',{:d})' \
                .format(self._devkit_path + '/evaluation', comp_id,
                        self._image_set, output_dir, int(rm_results))
-
+        """
+        
         print('Running:\n{}'.format(cmd))
         
         status = subprocess.call(cmd, shell=True)

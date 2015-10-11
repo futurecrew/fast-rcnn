@@ -1,14 +1,14 @@
 function res = voc_eval(path, comp_id, test_set, output_dir, rm_res)
 
 % DJDJ
-warning ("off", "Octave:num-to-str");
-warning ("off", "Octave:possible-matlab-short-circuit-operator");
+%warning ("off", "Octave:num-to-str");
+%warning ("off", "Octave:possible-matlab-short-circuit-operator");
 
 %{
-path = 'E:/data/VOCdevkit2';
-comp_id = 'comp4-6060';
+path = '/home/dj/big/data/VOCdevkit';
+comp_id = 'comp4-22192';
 test_set = 'test';
-output_dir = 'E:\project\fast-rcnn\output\fast_rcnn\voc_2007_test\vgg_cnn_m_1024_fast_rcnn_iter_40000_with_step_1_rpn_top_2300';
+output_dir = '/home/dj/big/workspace/fast-rcnn/output/fast_rcnn/voc_2007_test/vgg_cnn_m_1024_fast_rcnn_with_ss_iter_40000';
 rm_res = 1;
 %}
 

@@ -6,30 +6,37 @@ function res = imagenet_eval(path, comp_id, test_set, output_dir, rm_res)
 
 % DJDJ
 %{
-path = 'E:/data/ilsvrc14/ILSVRC2015_devkit/evaluation'
-comp_id ='comp4-2808'
+path = '/home/dj/big/data/ilsvrc14/ILSVRC2015_devkit/evaluation'
+comp_id ='comp4-1096'
 test_set = 'val'
-output_dir = 'E:\project\fast-rcnn\output\fast_rcnn\imagnet_val\vgg_cnn_m_1024_imagenet_fast_rcnn_step_2_iter_40000_with_step_1_rpn_top_2300'
+output_dir = '/home/dj/big/workspace/fast-rcnn/output/fast_rcnn/imagnet_val/vgg_cnn_m_1024_imagenet_fast_rcnn_step_2_iter_40000_with_step_1_rpn_top_2300'
 rm_res = 1
 %}
 
-warning ("off", "Octave:num-to-str");
-warning ("off", "Octave:possible-matlab-short-circuit-operator");
+
+%warning ("off", "Octave:num-to-str");
+%warning ("off", "Octave:possible-matlab-short-circuit-operator");
 
 fprintf('DETECTION TASK\n');
 
 org_dir = pwd;
 cd(path);
 
-#pred_file='demo.val.pred.det.txt';
+%pred_file='demo.val.pred.det.txt';
 meta_file = '../data/meta_det.mat';
-eval_file = '../data/det_lists/val.txt';
+if test_set == 'val_2000'
+    eval_file = '../data/det_lists/val_2000.txt';
+    optional_cache_file = '../data/ILSVRC2015_det_validation_ground_truth_2000.mat';
+else
+    eval_file = '../data/det_lists/val.txt';
+    optional_cache_file = '../data/ILSVRC2015_det_validation_ground_truth.mat';
+end
+
 blacklist_file = '../data/ILSVRC2015_det_validation_blacklist.txt';
 
 pred_file = sprintf('%s/../results/%s_det_%s.txt', path, comp_id, test_set)
 
-optional_cache_file = '../data/ILSVRC2015_det_validation_ground_truth.mat';
-ground_truth_dir = 'E:/data/ilsvrc14/ILSVRC2013_DET_bbox_val';
+ground_truth_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2013_DET_bbox_val';
 
 fprintf('pred_file: %s\n', pred_file);
 fprintf('meta_file: %s\n', meta_file);
@@ -83,7 +90,7 @@ fprintf(fileID, '~~~~~~~~~~~~~~~~~~~~\n');
 fclose(fileID);
 
 
-input('enter to continue'); 
+%input('enter to continue'); 
 
 
 cd(org_dir);
