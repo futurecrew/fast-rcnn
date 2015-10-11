@@ -21,9 +21,15 @@ def make_db(input_proposal, output_db):
     
     print 'reading input data file : %s' % input_proposal
     if '.pkl' in input_proposal:
-        with open(input_proposal, 'r') as f:
-            file_list = cPickle.load(f)
-            box_list = cPickle.load(f)
+        try:
+            with open(input_proposal, 'r') as f:
+                file_list = cPickle.load(f)
+                box_list = cPickle.load(f)
+        except:
+            with open(input_proposal, 'r') as f:
+                data = cPickle.load(f)
+                file_list = data['images'][0]
+                box_list = data['boxes']
         print 'finished reading the pickle file.'
     elif '.mat' in input_proposal:
         matlab_data = sio.loadmat(input_proposal)
@@ -48,6 +54,8 @@ def make_db(input_proposal, output_db):
 
     i = 0
     for file, box in zip(file_list, box_list):
+        if isinstance(file, list) == True:
+            file = file[0]
         batch.Put(file, cPickle.dumps(box))
         i += 1
         if i % 5000 == 0:
@@ -65,6 +73,7 @@ def make_db(input_proposal, output_db):
 def read_data(input_db):
     db = leveldb.LevelDB(input_db)
     
+    aa = db.Get('n01944390_22448')
     for key, value in db.RangeIter():
         print 'key : %s' % (key)
         boxes = cPickle.loads(value)
@@ -77,5 +86,6 @@ if __name__ == '__main__':
     input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
     output_db = input_proposal.split('.')[0] + '_db'
     
-    make_db(input_proposal, output_db)
+    #make_db(input_proposal, output_db)
     #read_data(output_db)    
+    read_data('/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate_db_backup/')

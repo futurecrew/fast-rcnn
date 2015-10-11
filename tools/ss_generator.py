@@ -147,7 +147,8 @@ def call_external_ss(img_base_folder, data_list, output_dir, extension,
         sio.savemat(final_ss_output_file, a)
     else:
         with open(final_ss_output_file, 'wb') as f:
-            cPickle.dump(a, f, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(images, f, cPickle.HIGHEST_PROTOCOL)
+            cPickle.dump(boxes, f, cPickle.HIGHEST_PROTOCOL)
     
     print 'Finished the selective search.'
     
