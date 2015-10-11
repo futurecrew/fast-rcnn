@@ -13,5 +13,5 @@ weight_decay: 0.0005
 # function
 snapshot: 0
 # We still use the snapshot prefix, though
-snapshot_prefix: "VGG16_imagenet_rpn"
+snapshot_prefix: "vgg16_imagenet_rpn"
 #debug_info: true
