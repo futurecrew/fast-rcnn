@@ -73,10 +73,18 @@ class SolverWrapper(object):
                     means = means.ravel()
                     stds = stds.ravel()
                     
+                    # Change zero stds to one to prevent divide by zero error below. 
+                    zero_stds_idx = np.where(stds == 0)
+                    stds[zero_stds_idx] = 1.0
+
                     extended_stds = stds[:, np.newaxis, np.newaxis, np.newaxis]
                 else:
                     means = self.bbox_means.ravel()
                     stds = self.bbox_stds.ravel()
+                    
+                    # Change zero stds to one to prevent divide by zero error below. 
+                    zero_stds_idx = np.where(stds == 0)
+                    stds[zero_stds_idx] = 1.0
 
                     extended_stds = stds[:, np.newaxis]
                     
