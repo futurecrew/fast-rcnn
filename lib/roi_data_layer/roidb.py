@@ -120,21 +120,20 @@ def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_sca
     for anchor_w, anchor_h in anchors:
         for center_y in xrange(0, conv_height):
             for center_x in xrange(0, conv_width):
-                #print 'processing [%s, %s]' % (center_y, center_x)
-
-                x1 = center_x * scale_width - anchor_w / 2
-                y1 = center_y * scale_height - anchor_h / 2
+                x1 = (center_x + 0.5) * scale_width - anchor_w / 2
+                y1 = (center_y + 0.5) * scale_height - anchor_h / 2
                 x2 = x1 + anchor_w
                 y2 = y1 + anchor_h
                 
                 anchor_i += 1
                 
                 if x1 < 0 or y1 < 0 or x2 > resized_im_width or y2 > resized_im_height:
+                    #print '(%s, %s, %s, %s) --' % (int(x1), int(y1), int(x2), int(y2))
                     continue
                 
                 boxes[anchor_i, :] = x1, y1, x2, y2
                 
-                #print '(%s, %s, %s, %s) appended' % (x1, y1, x2, y2)
+                #print '(%s, %s, %s, %s) appended' % (int(x1), int(y1), int(x2), int(y2))
     
     gt_overlaps = bbox_overlaps(boxes.astype(np.float),
                                 resized_gt_boxes.astype(np.float))
@@ -165,9 +164,10 @@ def prepare_one_roidb_rpn(roidb, resized_im_height, resized_im_width, resize_sca
     maxes = gt_overlaps.max(axis=0)
     
     for m in range(len(gt_boxes)):
-        labels[argmaxes[m]] = gt_classes[m]
-        gt_indexes[argmaxes[m]] = m
-        rois[argmaxes[m]] = boxes[argmaxes[m]]
+        if maxes[m] > 0:
+            labels[argmaxes[m]] = gt_classes[m]
+            gt_indexes[argmaxes[m]] = m
+            rois[argmaxes[m]] = boxes[argmaxes[m]]
     
     bbox_targets = _compute_targets_rpn(rois, labels, gt_indexes, resized_gt_boxes)
     
@@ -207,8 +207,10 @@ def prepare_roidb(imdb, model_to_use, proposal_file):
     recorded.
     """
 
-    cache_file_bbox_mean = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_bbox_means.pkl')
-    cache_file_roidb = os.path.join(imdb.cache_path, imdb.name + '_' + model_to_use + '_roidb.pkl')
+    train_model_name = cfg.MODEL_NAME
+
+    cache_file_bbox_mean = os.path.join(imdb.cache_path, imdb.name + '_' + train_model_name + '_' + model_to_use + '_bbox_means.pkl')
+    cache_file_roidb = os.path.join(imdb.cache_path, imdb.name + '_' + train_model_name + '_' + model_to_use + '_roidb.pkl')
 
     # Try to read the saved mean file
     if os.path.exists(cache_file_bbox_mean):
@@ -249,8 +251,16 @@ def prepare_roidb(imdb, model_to_use, proposal_file):
         roidb[i]['image'] = image_path
         roidb[i]['model_to_use'] = model_to_use    
         
-        #print 'image_path : %s' % image_path
+        # DJDJ
+        """
+        if i < 1400:
+            continue
+        if ('002798.jpg' in image_path) == False:
+            continue
+        """
         
+        #print 'image_path : %s' % image_path
+                
         im = cv2.imread(image_path)
         resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE, cfg.TRAIN.MIN_SIZE)            
         resized_im_height = round(im.shape[0] * resize_scale)

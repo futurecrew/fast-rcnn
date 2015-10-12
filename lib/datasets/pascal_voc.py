@@ -232,15 +232,7 @@ class pascal_voc(datasets.imdb):
             return roidb
         """
         
-        if int(self._year) == 2007 or self._image_set != 'test':
-            gt_roidb = self.gt_roidb()
-            
-            roidb = gt_roidb
-            
-            rpn_roidb = self._load_rpn_roidb(gt_roidb)
-            roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)
-        else:
-            roidb = self._load_rpn_roidb(None)
+        return self.gt_roidb()
             
         """
         with open(cache_file, 'wb') as fid:

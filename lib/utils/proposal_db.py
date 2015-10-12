@@ -22,11 +22,11 @@ def make_db(input_proposal, output_db):
     print 'reading input data file : %s' % input_proposal
     if '.pkl' in input_proposal:
         try:
-            with open(input_proposal, 'r') as f:
+            with open(input_proposal, 'rb') as f:
                 file_list = cPickle.load(f)
                 box_list = cPickle.load(f)
         except:
-            with open(input_proposal, 'r') as f:
+            with open(input_proposal, 'rb') as f:
                 data = cPickle.load(f)
                 file_list = data['images'][0]
                 box_list = data['boxes']

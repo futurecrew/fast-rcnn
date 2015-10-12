@@ -15,8 +15,11 @@ def get_img_rect(img_height, img_width, conv_height, conv_width, axis1, axis2, a
                        [256*2, 256*1], [256*1, 256*1], [256*1, 256*2], 
                        [512*2, 512*1], [512*1, 512*1], [512*1, 512*2]])
             
-    img_center_x = img_width * axis3 / conv_width
-    img_center_y = img_height * axis2 / conv_height
+    scale_width = img_width / conv_width
+    scale_height = img_height / conv_height
+    
+    img_center_x = img_width * axis3 / conv_width + scale_width / 2
+    img_center_y = img_height * axis2 / conv_height + scale_height / 2
     anchor_size = anchors[axis1]
     img_x1 = img_center_x - anchor_size[:, 0] / 2 
     img_x2 = img_center_x + anchor_size[:, 0] / 2 
