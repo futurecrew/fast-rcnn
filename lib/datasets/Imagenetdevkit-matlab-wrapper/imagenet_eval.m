@@ -18,13 +18,14 @@ rm_res = 1
 %warning ("off", "Octave:possible-matlab-short-circuit-operator");
 
 fprintf('DETECTION TASK\n');
+fprintf('test_set: %s\n', test_set);
 
 org_dir = pwd;
 cd(path);
 
 %pred_file='demo.val.pred.det.txt';
 meta_file = '../data/meta_det.mat';
-if test_set == 'val_2000'
+if strcmp(test_set, 'val_2000') == 1
     eval_file = '../data/det_lists/val_2000.txt';
     optional_cache_file = '../data/ILSVRC2015_det_validation_ground_truth_2000.mat';
 else
