@@ -47,9 +47,8 @@ def _get_image_blob(im):
         # Prevent the biggest axis from being more than MAX_SIZE
         if np.round(im_scale * im_size_max) > cfg.TEST.MAX_SIZE:
             im_scale = float(cfg.TEST.MAX_SIZE) / float(im_size_max)
-
         # Prevent the shortest axis from being less than LESS_SIZE
-        if np.round(im_scale * im_size_min) < cfg.TEST.MIN_SIZE:
+        elif np.round(im_scale * im_size_min) < cfg.TEST.MIN_SIZE:
             im_scale = float(cfg.TEST.MIN_SIZE) / float(im_size_min)
 
         im = cv2.resize(im_orig, None, None, fx=im_scale, fy=im_scale,
@@ -222,6 +221,9 @@ def im_detect(net, im, boxes):
         scores = scores[inv_index, :]
         pred_boxes = pred_boxes[inv_index, :]
 
+    blobs['data'] = None
+    blobs['rois'] = None
+
     return scores, pred_boxes
 
 def im_detect_mixed(net, im):
@@ -345,6 +347,7 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
 
         proposals = candidiate_db.Get(roidb[i]['label_file'].split('.')[0])
         proposals = cPickle.loads(proposals)
+        proposals = proposals[:cfg.MAX_PROPOSAL_NO]
         
         scores, boxes = im_detect(net, im, proposals)
         _t['im_detect'].toc()
@@ -394,6 +397,8 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
 
     print 'Applying NMS to all detections'
     nms_dets = apply_nms(all_boxes, cfg.TEST.NMS)
+    
+    all_boxes = None
 
     print 'Evaluating detections'
     imdb.evaluate_detections(nms_dets, output_dir)

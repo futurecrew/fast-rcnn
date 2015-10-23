@@ -37,7 +37,10 @@ def make_db(input_proposal, output_db):
         raw_box_data = matlab_data['boxes'].ravel()
         file_list = []
         for i in xrange(raw_file_data.shape[0]):
-            file_list.append(raw_file_data[i][0].encode('ascii', 'ignore'))
+            file = raw_file_data[i]
+            if isinstance(file, list) == True:
+                file = file[0]
+            file_list.append(file.encode('ascii', 'ignore'))
         box_list = []
         for i in xrange(raw_box_data.shape[0]):
             box_list.append(raw_box_data[i][:, (1, 0, 3, 2)] - 1)
@@ -80,12 +83,13 @@ def read_data(input_db):
         #print boxes        
 
 if __name__ == '__main__':
-    #input_proposal = 'E:/project/fast-rcnn/output/rpn_data/imagenet_val/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
     #input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
     #input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_val/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate.pkl'
-    input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
+    #input_proposal = '/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg16_step_1_rpn_top_2300_candidate.pkl'
+    #input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_trainval.mat'
+    input_proposal = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/imagenet_val.mat'
     output_db = input_proposal.split('.')[0] + '_db'
     
-    #make_db(input_proposal, output_db)
+    make_db(input_proposal, output_db)
     #read_data(output_db)    
-    read_data('/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate_db_backup/')
+    #read_data('/home/dj/big/workspace/fast-rcnn/output/rpn_data/imagenet_train/vgg_cnn_m_1024_step_1_rpn_top_2300_candidate_db_backup/')
