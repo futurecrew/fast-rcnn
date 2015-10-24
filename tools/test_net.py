@@ -95,6 +95,8 @@ if __name__ == '__main__':
 
     if 'VGG16' in args.caffemodel.upper():
         model_name = 'VGG16'
+    elif 'VGG19' in args.caffemodel.upper():
+        model_name = 'VGG19'
     elif 'VGG_CNN_M_1024' in args.caffemodel.upper():
         model_name = 'VGG_CNN_M_1024'
     elif 'GOOGLENET2' in args.caffemodel.upper():

@@ -109,6 +109,8 @@ if __name__ == '__main__':
         
     if 'VGG16' in model_name:
         model_name = 'VGG16'
+    elif 'VGG19' in model_name:
+        model_name = 'VGG19'
     elif 'VGG_CNN_M_1024' in model_name:
         model_name = 'VGG_CNN_M_1024'
     elif 'GOOGLENET2' in model_name:
@@ -121,6 +123,8 @@ if __name__ == '__main__':
         model_name = 'GOOGLENET5'
     elif 'GOOGLENET' in model_name:
         model_name = 'GOOGLENET'
+    elif 'INCEPTION' in model_name:
+        model_name = 'GOOGLENET_BN'
     else:
         raise Exception("This model is not supported. %s" % model_name)
     
