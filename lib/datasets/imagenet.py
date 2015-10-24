@@ -44,6 +44,10 @@ class imagenet(datasets.pascal_voc):
             self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
             self._image_path = self._data_path + '/ILSVRC2013_DET_val'
             self._data_id_file = self._devkit_path + '/data/det_lists/val.txt'
+        elif image_set == 'val_10':
+            self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
+            self._image_path = self._data_path + '/ILSVRC2013_DET_val'
+            self._data_id_file = self._devkit_path + '/data/det_lists/val_10.txt'
         elif image_set == 'val_2000':
             self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
             self._image_path = self._data_path + '/ILSVRC2013_DET_val'
@@ -178,6 +182,9 @@ class imagenet(datasets.pascal_voc):
 
         This function loads/saves from/to a cache file to speed up future calls.
         """
+        return self.gt_roidb()
+
+        """        
         cache_file = os.path.join(self.cache_path,
                                   self.name + '_selective_search_roidb.pkl')
 
@@ -195,6 +202,7 @@ class imagenet(datasets.pascal_voc):
         print 'wrote ss roidb to {}'.format(cache_file)
 
         return roidb
+        """
 
     def _load_selective_search_roidb(self, gt_roidb):
         filename = os.path.abspath(os.path.join(self.cache_path, '..',
@@ -374,6 +382,11 @@ class imagenet(datasets.pascal_voc):
                                 format(index_id, cls_ind, dets[k, -1],
                                        dets[k, 0], dets[k, 1],
                                        dets[k, 2], dets[k, 3]))
+                        
+        # Make none to save memory
+        all_boxes[:] = []
+        print 'boxes are cleared in the memory.'
+        
         return comp_id
 
     def _do_matlab_eval(self, comp_id, output_dir='output'):
