@@ -20,7 +20,7 @@ def parse_args():
 def gogo():
     print 'starting ensemble'
 
-    thresh = 0.001
+    thresh = 0.01
     imdb_name = 'imagenet_val'
     base_dir = '/home/dj/big/workspace/fast-rcnn/output/ensemble/'
     data = []
@@ -38,8 +38,14 @@ def gogo():
     data.append('vgg16_imagenet_fast_rcnn_step4_with_rpn_iter_360000')
 
     # vgg19 frcnn    
-    #data.append('vgg19_imagenet_fast_rcnn_with_ss_iter_470000')
+    data.append('vgg19_imagenet_fast_rcnn_with_ss_iter_470000')
 
+    # googlenet frcnn    
+    #data.append('googlenet_imagenet_fast_rcnn_ss_iter_480000')
+
+    # vgg16 step 3
+    data.append('vgg16_imagenet_fast_rcnn_step2_with_rpn_step3_iter_520000')
+    
     output_dir = '%s/results' % base_dir 
     
     i = 0

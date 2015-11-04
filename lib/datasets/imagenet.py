@@ -52,6 +52,10 @@ class imagenet(datasets.pascal_voc):
             self._label_path = self._data_path + '/ILSVRC2013_DET_bbox_val'
             self._image_path = self._data_path + '/ILSVRC2013_DET_val'
             self._data_id_file = self._devkit_path + '/data/det_lists/val_2000.txt'
+        elif image_set == 'test':
+            self._label_path = None
+            self._image_path = self._data_path + '/ILSVRC2015_DET_test'
+            self._data_id_file = self._devkit_path + '/data/det_lists/test.txt'
         
         class_name_list_file = 'data/imagenet_det.txt'
         self._classes_names, self._classes= self._load_class_info(self._data_path + '/ILSVRC2015_devkit/data/meta_det.mat',
@@ -60,7 +64,9 @@ class imagenet(datasets.pascal_voc):
         self._image_ext = '.JPEG'
         self._image_index = self._load_image_set_index()
         self._gt_roidb = None
-        self.gt_roidb()
+        
+        if self._image_set != 'test':
+            self.gt_roidb()
         self.proposal_file = proposal_file
         
         # Default to roidb handler
@@ -273,8 +279,11 @@ class imagenet(datasets.pascal_voc):
         Ground-truth ROIs are also included.
         """
         
-        gt_roidb = self.gt_roidb()
-        return gt_roidb
+        if self._image_set != 'test':
+            gt_roidb = self.gt_roidb()
+            return gt_roidb
+        else:
+            return None
     
         #rpn_roidb = self._load_rpn_roidb(gt_roidb)
         #roidb = datasets.imdb.merge_roidbs(gt_roidb, rpn_roidb)        

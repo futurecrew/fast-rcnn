@@ -14,6 +14,7 @@ from skimage.morphology import white_tophat, black_tophat
 from skimage.morphology import disk
 from skimage import measure
 from skimage import morphology
+import cv2
 
 import matplotlib.pyplot as plt
 import leveldb
@@ -285,10 +286,10 @@ class Converter:
                        channel_no, preserve_ar):
         
         self.remove_folder(train_db_name)
-        self.remove_folder(valid_db_name)
+        #self.remove_folder(valid_db_name)
                 
         self.train_db = leveldb.LevelDB(train_db_name)
-        self.valid_db = leveldb.LevelDB(valid_db_name)
+        #self.valid_db = leveldb.LevelDB(valid_db_name)
     
         self.datum = caffe.proto.caffe_pb2.Datum()
         self.datum.channels = channel_no
@@ -300,7 +301,9 @@ class Converter:
         print "valid_db_name : %s" % valid_db_name
         print "channel_no : %s" % channel_no
     
-        modes = ['train', 'valid']
+        #modes = ['train', 'valid']
+        modes = ['train']
+        #modes = ['valid']
         
         start_time = time.time()
         
@@ -327,7 +330,7 @@ class Converter:
                 file_path = file_path.replace('\r', '')
                 file_path = file_path.replace('\n', '')
                 
-                
+                """
                 org_image = Image.open(data_folder + '/' + file_path)                
                 org_size = org_image.size
                 
@@ -346,16 +349,36 @@ class Converter:
                     image_width = min_pixel
                     image_height = min_pixel
 
-                #if file_path.endswith('n04008634_20954.JPEG'):
-                #    print 'here'
-                #if file_path.endswith('n02105855_2933.JPEG'):
-                #    print 'here'
-
                 if org_image.mode != 'RGB':                    
                     #print org_image.mode 
                     org_image = org_image.convert('RGB')
                 
                 image = org_image.resize((image_width, image_height), Image.ANTIALIAS)
+                """
+
+                org_image = cv2.imread(data_folder + '/' + file_path)                
+                org_size = org_image.shape
+                
+                if preserve_ar == 'preserve':
+                    if org_size[1] > org_size[0]:
+                        im_scale = (min_pixel/float(org_size[0]))
+                        wsize = int((float(org_size[1])*float(im_scale)))
+                        image_width = wsize
+                        image_height = min_pixel
+                    else:
+                        im_scale = (min_pixel/float(org_size[1]))
+                        hsize = int((float(org_size[0])*float(im_scale)))
+                        image_width = min_pixel
+                        image_height = hsize
+                elif preserve_ar == 'ignore':
+                    image_width = min_pixel
+                    image_height = min_pixel
+
+                #if org_image.mode != 'RGB':                    
+                #    org_image = org_image.convert('RGB')
+
+                image = cv2.resize(org_image, (image_width, image_height),
+                    interpolation=cv2.INTER_LINEAR)
 
                 self.datum.width = image_width
                 self.datum.height = image_height
@@ -375,7 +398,7 @@ class Converter:
                     del self.valid_batch
                     self.valid_batch = leveldb.WriteBatch()
                     print 'Processed %i valid images.' % self.valid_no
-                    
+
         # Write last batch of images
         if self.train_no % 1000 != 0:
             self.train_db.Write(self.train_batch, sync = True)
@@ -642,11 +665,9 @@ if __name__ == '__main__':
 
     converter = Converter(label_id_mapping_file)
 
-    """
     converter.generate_data_list(train_data_folder, valid_data_folder, 
                                   train_list_file, valid_list_file, 
                                   valid_label_file, shuffle_in_folder)
-    """
 
     converter.convert_data_to_db(train_data_folder, valid_data_folder, min_pixel, 
                        train_db_name, valid_db_name, 

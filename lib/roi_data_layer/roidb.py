@@ -280,112 +280,6 @@ def prepare_roidb_one_process(cpu_id, roidb, image_index,
 
     queue_child_to_parent.put(queue_data)
 
-def prepare_roidb_Old(imdb, model_to_use, proposal_file):
-    """ Old """
-    """Enrich the imdb's roidb by adding some derived quantities that
-    are useful for training. This function precomputes the maximum
-    overlap, taken over ground-truth boxes, between each ROI and
-    each ground-truth box. The class with maximum overlap is also
-    recorded.
-    """
-
-    train_model_name = cfg.MODEL_NAME
-
-    cache_file_bbox_mean = os.path.join(imdb.cache_path, imdb.name + '_' + train_model_name + '_' + model_to_use + '_bbox_means.pkl')
-    cache_file_roidb = os.path.join(imdb.cache_path, imdb.name + '_' + train_model_name + '_' + model_to_use + '_roidb.pkl')
-
-    # Try to read the saved mean file
-    if os.path.exists(cache_file_bbox_mean):
-        with open(cache_file_bbox_mean, 'rb') as fid:
-            imdb.bbox_means = cPickle.load(fid)
-            imdb.bbox_stds = cPickle.load(fid)
-
-        print 'imdb.bbox_means : %s' % imdb.bbox_means
-        print 'imdb.bbox_stds : %s' % imdb.bbox_stds
-        
-        print '{} bbox mean file is loaded from {}'.format(imdb.name, cache_file_bbox_mean)
-
-    # Try to read the saved roidb file
-    if os.path.exists(cache_file_roidb):
-        with open(cache_file_roidb, 'rb') as fid:
-            imdb._roidb = cPickle.load(fid)
-        
-        print '{} roidb file is loaded from {}'.format(imdb.name, cache_file_roidb)
-        print 'len(imdb._roidb) : %s' % len(imdb._roidb)
-        return
-
-    num_classes = imdb.num_classes
-    roidb = imdb.roidb
-
-    if model_to_use == 'rpn':
-        bbox_class_counts = 0
-        bbox_sums = np.zeros((1, 4))
-        bbox_squared_sums = np.zeros((1, 4))
-    elif model_to_use == 'frcnn':
-        bbox_class_counts = np.zeros((num_classes, 1)) + cfg.EPS
-        bbox_sums = np.zeros((num_classes, 4))
-        bbox_squared_sums = np.zeros((num_classes, 4))
-
-    print 'len(imdb.image_index) : %s' % len(imdb.image_index)
-
-    for i in xrange(len(imdb.image_index)):
-        image_path = imdb.image_path_at(i)
-        roidb[i]['image'] = image_path
-        roidb[i]['model_to_use'] = model_to_use    
-      
-        print 'image_path : %s' % image_path
-                
-        im = cv2.imread(image_path)
-        resize_scale = im_scale_after_resize(im, cfg.TRAIN.SCALES[0], cfg.TRAIN.MAX_SIZE, cfg.TRAIN.MIN_SIZE)            
-        resized_im_height = round(im.shape[0] * resize_scale)
-        resized_im_width = round(im.shape[1] * resize_scale)
-
-        if model_to_use == 'rpn':
-            prepare_one_roidb_rpn(roidb[i], resized_im_height, resized_im_width, resize_scale)
-
-            bbox_targets = roidb[i]['bbox_targets']
-            cls_inds = np.where(bbox_targets[:, 0] > 0)[0]
-            if cls_inds.size > 0:
-                bbox_class_counts += cls_inds.size
-                bbox_sums[0, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
-                bbox_squared_sums[0, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
-
-        elif model_to_use == 'frcnn':
-            prepare_one_roidb_frcnn(roidb[i], proposal_file, num_classes)
-            
-            bbox_targets = roidb[i]['bbox_targets']
-            for cls in xrange(1, num_classes):
-                cls_inds = np.where(bbox_targets[:, 0] == cls)[0]
-                if cls_inds.size > 0:
-                    bbox_class_counts[cls] += cls_inds.size
-                    bbox_sums[cls, :] += bbox_targets[cls_inds, 1:].sum(axis=0)
-                    bbox_squared_sums[cls, :] += (bbox_targets[cls_inds, 1:] ** 2).sum(axis=0)
-        
-        # Erase memory in case of LAZY_PREPARING_ROIDB not to use memory
-        # max_classes and bbox_targets will be calculated again in minibatch
-        if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:
-            clear_one_roidb(roidb[i])
-            
-        if i % 100 == 0:
-            print 'processing image %s' % i
-
-    print 'processed %d images' % (i + 1)
-
-    imdb.bbox_means = bbox_sums / bbox_class_counts
-    imdb.bbox_stds = np.sqrt(bbox_squared_sums / bbox_class_counts - imdb.bbox_means ** 2)
-    
-    print 'imdb.bbox_means : %s' % imdb.bbox_means
-    print 'imdb.bbox_stds : %s' % imdb.bbox_stds
-    
-    with open(cache_file_bbox_mean, 'wb') as fid:
-        cPickle.dump(imdb.bbox_means, fid, cPickle.HIGHEST_PROTOCOL)
-        cPickle.dump(imdb.bbox_stds, fid, cPickle.HIGHEST_PROTOCOL)
-    print 'wrote bbox means to {}'.format(cache_file_bbox_mean)
-
-    with open(cache_file_roidb, 'wb') as fid:
-        cPickle.dump(imdb.roidb, fid, cPickle.HIGHEST_PROTOCOL)
-    print 'wrote roidb to {}'.format(cache_file_roidb)
-    
 def prepare_roidb(imdb, model_to_use, proposal_file):
     """ New """
     """Enrich the imdb's roidb by adding some derived quantities that
@@ -420,7 +314,7 @@ def prepare_roidb(imdb, model_to_use, proposal_file):
         print 'len(imdb._roidb) : %s' % len(imdb._roidb)
         return
 
-    MULTI_CPU_NO = 6
+    MULTI_CPU_NO = 5
     num_classes = imdb.num_classes
     roidb = imdb.roidb
 

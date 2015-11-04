@@ -33,8 +33,8 @@ def read_child_info(meta_det_file_all, det_file):
         else:
             continue
         
-        #if wnid == 'n02346627':
-         #   print 'hehe'
+        #if wnid == 'n07739125':
+        #   print 'hehe'
             
         
         child_list = []
@@ -84,6 +84,24 @@ def create_train_data(det_file, base_train_img_dir, target_train_img_dir, det_pa
             i += 1
             print '%s %s done' % (i, wnid)
 
+def create_train_data_new(det_file, base_train_img_dir, target_train_img_dir, det_parent_to_children_map):
+    with open(det_file, 'r') as f:
+        i = 0
+        for line in f.readlines():
+            wnid = line.split(' ')[0]
+            src_tar = base_train_img_dir + '/' + wnid + '_*.JPEG'
+            dest_dir = target_train_img_dir + '/' + wnid
+    
+            if os.path.exists(dest_dir) == False:
+                os.mkdir (dest_dir)
+            
+            cmd = 'cp ' + src_tar + ' ' + dest_dir
+            subprocess.call(cmd, shell=True)
+            print 'copied parent %s' % src_tar
+                
+            i += 1
+            print '%s %s done' % (i, wnid)
+            
 def create_valid_data(det_file, cls_file, base_valid_img_dir, target_valid_img_dir, 
                       parent_to_child_map, det_children_list, 
                       det_child_to_parent_map, det_parent_list, 
@@ -173,13 +191,14 @@ if __name__ == '__main__':
     det_file = '/home/dj/big/data/ilsvrc14/ILSVRC2015_devkit/data/map_det.txt'
     meta_det_file_all = '/home/dj/big/data/ilsvrc14/ILSVRC2014_devkit/data/meta_det.mat'
     cls_valid_gt = '/home/dj/big/data/ilsvrc14/ILSVRC2015_devkit/data/ILSVRC2015_clsloc_validation_ground_truth.txt'
-    base_train_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2012_img_train'
+    base_train_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2012_img_train/'
+    #base_train_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data/'
     target_train_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2012_img_train_200'
     base_valid_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2012_img_val'
     target_valid_img_dir = '/home/dj/big/data/ilsvrc14/ILSVRC2012_img_val_200'
     
     parent_to_child_map, det_children_list, det_child_to_parent_map, det_parent_list = \
         read_child_info(meta_det_file_all, det_file)
-    #create_train_data(det_file, base_train_img_dir, target_train_img_dir, det_parent_to_children_map)
-    create_valid_data(det_file, cls_file, base_valid_img_dir, target_valid_img_dir, parent_to_child_map, det_children_list, det_child_to_parent_map, det_parent_list, cls_valid_gt)
+    create_train_data(det_file, base_train_img_dir, target_train_img_dir, parent_to_child_map)
+    #create_valid_data(det_file, cls_file, base_valid_img_dir, target_valid_img_dir, parent_to_child_map, det_children_list, det_child_to_parent_map, det_parent_list, cls_valid_gt)
     

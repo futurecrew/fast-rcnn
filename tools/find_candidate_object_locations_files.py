@@ -30,8 +30,12 @@ from utils.proposal_db import make_db
 def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
          data_folder, data_ext, prototxt, 
          caffemodel, gt, data_list, test_data, model_name, step):
-    with open(gt, 'rb') as fid:
-        gtdb = cPickle.load(fid)
+    
+    if gt != None:
+        with open(gt, 'rb') as fid:
+            gtdb = cPickle.load(fid)
+    else:
+        gtdb = None
     
     total_no_to_find = 0
     total_no_found = 0
@@ -41,10 +45,12 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     # DJDJ
     #gtdb = gtdb[0:300]
     
+    input_data = []
     if data_list != None and os.path.exists(data_list):
-        input_data = open(data_list).readlines()
+        with open(data_list, 'rt') as f:
+            for one_line in f.readlines():
+                input_data.append(one_line.split(' ')[0])  
     else:
-        input_data = []
         for gt in gtdb:
             input_data.append(gt['label_file'].split('.xml')[0])
     
@@ -64,12 +70,17 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
         gpu_id = gpu_id_list[i]
         
         print 'creating a gpu process[%s] (%s ~ %s)' % (gpu_id, start_idx, end_idx-1)
+        if gtdb != None:
+            partial_gtdb = gtdb[start_idx : end_idx]
+        else:
+            partial_gtdb = None
+        
         p = Process(target=gogo_one_gpu, args=(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
                                                gpu_id, queue_gpu_to_main,
                                                data_folder, data_ext, prototxt, 
                                                proposal_folder,
                                                input_data[start_idx : end_idx], 
-                                               gtdb[start_idx : end_idx],
+                                               partial_gtdb,
                                                caffemodel))
         p.start()
 
@@ -101,7 +112,8 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
 
 
     print 'total elapsed time = %.1f min' % (float(time.time() - start_time) / 60)
-    print 'total accuracy [%s/%s] : %.3f' % (total_no_found, total_no_to_find,
+    if gt != None:
+        print 'total accuracy [%s/%s] : %.3f' % (total_no_found, total_no_to_find,
                                              float(total_no_found) / float(total_no_to_find))  
     
     # Save RPN proposal boxes    
@@ -145,8 +157,14 @@ def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,
         end_idx = min(chunk_size * (i + 1), total_data_no)
         
         print 'creating a child process[%s] (%s ~ %s)' % (i, start_idx, end_idx-1)
+        
+        if gtdb != None:
+            partial_gtdb = gtdb[start_idx : end_idx]
+        else:
+            partial_gtdb = None
+        
         p = Process(target=predict, args=(gpuid, i, input_data[start_idx : end_idx], 
-                                   gtdb[start_idx : end_idx], data_folder, 
+                                   partial_gtdb, data_folder, 
                                    data_ext, queue_child_to_gpu, 
                                    queue_gpu_to_child, 
                                    MAX_CAND_AFTER_NMS))
@@ -230,15 +248,18 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
 
         no += 1
         
-        gt_boxes = gtdb[no-1]['gt_boxes']
+        if gtdb != None:
+            gt_boxes = gtdb[no-1]['gt_boxes']
             
-        # if there is no ground truth then ignore this image
-        if len(gt_boxes) == 0:
-            print 'no labels'
-            continue
+            # if there is no ground truth then ignore this image
+            if len(gt_boxes) == 0:
+                print 'no labels'
+                continue
+        else:
+            gt_boxes = None
         
         # DJDJ
-        #if file_name != '000009':
+        #if file_name != 'ILSVRC2014_train_00000021':
         #    continue
         
         #print 'data file : %s' % (data_folder + '/' + file_name + '.' + data_ext)
@@ -282,23 +303,23 @@ def predict(gpuid, pid, input_data, gtdb, data_folder, data_ext,
             
         file_full_path = data_folder + '/' + file_name + '.' + data_ext
         
-        no_to_find, no_found = check_match(file_name, file_full_path,
-                                                blobs['data'], gt_boxes, 
-                                                pred_boxes, match_threshold, 
-                                                sorted_scores, rigid_rects)
-
         no_candidates = len(pred_boxes)
         
-        total_no_to_find += no_to_find
-        total_no_found += no_found
+        if gt_boxes != None:
+            no_to_find, no_found = check_match(file_name, file_full_path,
+                                                    blobs['data'], gt_boxes, 
+                                                    pred_boxes, match_threshold, 
+                                                    sorted_scores, rigid_rects)
+    
+            total_no_to_find += no_to_find
+            total_no_found += no_found
          
-        print 'gpu pid [%s][%s][%s/%s]' % (gpuid, pid, no, len(input_data))  
-        
-        """ 
-        print 'gpu pid [%s][%s][%s/%s] accuracy : %.3f' % (gpuid, pid, no, 
+            print 'gpu pid [%s][%s][%s/%s] accuracy : %.3f' % (gpuid, pid, no, 
                                                       len(input_data), 
-                                                      float(total_no_found) / float(total_no_to_find))  
-        """
+                                                      float(total_no_found) / float(total_no_to_find))
+        else:  
+            print 'gpu pid [%s][%s][%s/%s]' % (gpuid, pid, no, len(input_data))  
+        
         
         """
         for i in range(len(pred_boxes)):
@@ -360,7 +381,7 @@ def check_match(file_name, file_full_path, im_blob, ground_rects, pred_rects, ma
             
             found_rects.append(max_overlap_rect)
 
-    #print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
+    print '%s out of %s found using %s candidates. %s.jpg' %(no_found, no_to_find, len(pred_rects), file_name)
 
     if False:
     #if True and file_name == 'ILSVRC2012_val_00000096':
@@ -469,7 +490,7 @@ def parse_args():
     return args
 
 if __name__ == '__main__':
-    MULTI_CPU_NO = 10
+    MULTI_CPU_NO = 5
     
     args = parse_args()
 
@@ -516,10 +537,15 @@ if __name__ == '__main__':
             gt = 'data/cache/imagenet_train_gt_roidb.pkl'
             data_folder = '/home/dj/data/ilsvrc14/ILSVRC2014_DET_train/ILSVRC2014_DET_train_all_data'
             test_data = 'imagenet_train'
-        elif args.data_type == 'test':
+        elif args.data_type == 'val':
             gt = 'data/cache/imagenet_val_gt_roidb.pkl'
             data_folder = '/home/dj/data/ilsvrc14/ILSVRC2013_DET_val'
             test_data = 'imagenet_val'            
+        elif args.data_type == 'test':
+            gt = None
+            data_list = '/home/dj/big/data/ilsvrc14/ILSVRC2015_devkit/data/det_lists/test.txt'
+            data_folder = '/home/dj/data/ilsvrc14/ILSVRC2015_DET_test'
+            test_data = 'imagenet_test'
         data_ext = 'JPEG'
     """
     if 'voc_2007' in args.imdb_name:
