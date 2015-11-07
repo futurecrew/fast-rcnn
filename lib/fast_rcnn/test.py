@@ -179,51 +179,56 @@ def im_detect(net, im, boxes):
     """
     blobs, unused_im_scale_factors = _get_blobs(im, boxes)
 
-    # When mapping from image ROIs to feature map ROIs, there's some aliasing
-    # (some distinct image ROIs get mapped to the same feature ROI).
-    # Here, we identify duplicate feature ROIs, so we only compute features
-    # on the unique subset.
-    if cfg.DEDUP_BOXES > 0:
-        v = np.array([1, 1e3, 1e6, 1e9, 1e12])
-        hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
-        _, index, inv_index = np.unique(hashes, return_index=True,
-                                        return_inverse=True)
-        blobs['rois'] = blobs['rois'][index, :]
-        boxes = boxes[index, :]
-
-    # reshape network inputs
-    net.blobs['data'].reshape(*(blobs['data'].shape))
-    net.blobs['rois'].reshape(*(blobs['rois'].shape))
-    blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
-                            rois=blobs['rois'].astype(np.float32, copy=False))
-    if cfg.TEST.SVM:
-        # use the raw scores before softmax under the assumption they
-        # were trained as linear SVMs
-        scores = net.blobs['cls_score'].data
-    else:
-        # use softmax estimated probabilities
-        scores = blobs_out['cls_prob']
-
-    if cfg.TEST.BBOX_REG:
-        # Apply bounding-box regression deltas
-        if 'bbox_pred_rpn' in blobs_out:
-            box_deltas = blobs_out['bbox_pred_rpn']
+    if len(blobs['rois']) > 0:
+        # When mapping from image ROIs to feature map ROIs, there's some aliasing
+        # (some distinct image ROIs get mapped to the same feature ROI).
+        # Here, we identify duplicate feature ROIs, so we only compute features
+        # on the unique subset.
+        if cfg.DEDUP_BOXES > 0:
+            v = np.array([1, 1e3, 1e6, 1e9, 1e12])
+            hashes = np.round(blobs['rois'] * cfg.DEDUP_BOXES).dot(v)
+            _, index, inv_index = np.unique(hashes, return_index=True,
+                                            return_inverse=True)
+            blobs['rois'] = blobs['rois'][index, :]
+            boxes = boxes[index, :]
+    
+        # reshape network inputs
+        net.blobs['data'].reshape(*(blobs['data'].shape))
+        net.blobs['rois'].reshape(*(blobs['rois'].shape))
+        blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+                                rois=blobs['rois'].astype(np.float32, copy=False))
+        if cfg.TEST.SVM:
+            # use the raw scores before softmax under the assumption they
+            # were trained as linear SVMs
+            scores = net.blobs['cls_score'].data
         else:
-            box_deltas = blobs_out['bbox_pred']
-        pred_boxes = _bbox_pred(boxes, box_deltas)
-        pred_boxes = _clip_boxes(pred_boxes, im.shape)
+            # use softmax estimated probabilities
+            scores = blobs_out['cls_prob']
+    
+        if cfg.TEST.BBOX_REG:
+            # Apply bounding-box regression deltas
+            if 'bbox_pred_rpn' in blobs_out:
+                box_deltas = blobs_out['bbox_pred_rpn']
+            else:
+                box_deltas = blobs_out['bbox_pred']
+            pred_boxes = _bbox_pred(boxes, box_deltas)
+            pred_boxes = _clip_boxes(pred_boxes, im.shape)
+        else:
+            # Simply repeat the boxes, once for each class
+            pred_boxes = np.tile(boxes, (1, scores.shape[1]))
+    
+        if cfg.DEDUP_BOXES > 0:
+            # Map scores and predictions back to the original set of boxes
+            scores = scores[inv_index, :]
+            pred_boxes = pred_boxes[inv_index, :]
+    
+        blobs['data'] = None
+        blobs['rois'] = None
     else:
-        # Simply repeat the boxes, once for each class
-        pred_boxes = np.tile(boxes, (1, scores.shape[1]))
-
-    if cfg.DEDUP_BOXES > 0:
-        # Map scores and predictions back to the original set of boxes
-        scores = scores[inv_index, :]
-        pred_boxes = pred_boxes[inv_index, :]
-
-    blobs['data'] = None
-    blobs['rois'] = None
-
+        # DJDJ 
+        scores = np.array([[0] * 201])
+        pred_boxes = np.array([[0] * 804])
+        
     return scores, pred_boxes
 
 def im_detect_mixed(net, im):
@@ -302,8 +307,9 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(net, imdb, proposal, proposal_file, output_dir):
+def test_net(nets, imdb, proposal, proposal_file, output_dir):
     """Test a Fast R-CNN network on an image database."""
+    
     num_images = len(imdb.image_index)
     
     # DJDJ
@@ -329,7 +335,7 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
                  for _ in xrange(imdb.num_classes)]
 
     if len(output_dir) == 0: 
-        output_dir = get_output_dir(imdb, net)
+        output_dir = get_output_dir(imdb, nets[0])
     else:
         output_dir = osp.abspath(output_dir)
 
@@ -354,10 +360,22 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
         proposals = candidiate_db.Get(data_id)
         proposals = cPickle.loads(proposals)
         proposals = proposals[:cfg.MAX_PROPOSAL_NO]
-        
-        scores, boxes = im_detect(net, im, proposals)
-        _t['im_detect'].toc()
 
+        total_scores = np.zeros((len(nets), len(proposals), 201))
+        total_boxes = np.zeros((len(nets), len(proposals), 804))
+        
+        net_no = 0
+        for net in nets:
+            scores, boxes = im_detect(net, im, proposals)
+            total_scores[net_no, :, :] = scores
+            total_boxes[net_no, :, :] = boxes
+            net_no += 1
+
+        scores = np.average(total_scores, axis=0)
+        boxes = np.average(total_boxes, axis=0)
+            
+        _t['im_detect'].toc()
+    
         _t['misc'].tic()
         for j in xrange(1, imdb.num_classes):
             inds = np.where((scores[:, j] >= base_thresh))[0]
@@ -389,9 +407,8 @@ def test_net(net, imdb, proposal, proposal_file, output_dir):
                 vis_detections(im, imdb.classes[j], all_boxes[j][i][keep, :])
         _t['misc'].toc()
 
-        print 'im_detect: {:d}/{:d} {:.3f}s {:.3f}s' \
-              .format(i + 1, num_images, _t['im_detect'].average_time,
-                      _t['misc'].average_time)
+        print 'im_detect: {:d}/{:d} {:.3f}s' \
+              .format(i + 1, num_images, _t['im_detect'].average_time)
 
     for j in xrange(1, imdb.num_classes):
         for i in xrange(num_images):

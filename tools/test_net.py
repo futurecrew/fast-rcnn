@@ -74,10 +74,6 @@ if __name__ == '__main__':
     print('Using config:')
     pprint.pprint(cfg)
 
-    while not os.path.exists(args.caffemodel) and args.wait:
-        print('Waiting for {} to exist...'.format(args.caffemodel))
-        time.sleep(10)
-
     prevent_sleep()
     
     # DJDJ
@@ -85,8 +81,15 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     caffe.set_device(args.gpu_id)
     
-    net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
-    net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
+    nets = []
+    for caffemodel in args.caffemodel.split(','):
+        while not os.path.exists(caffemodel) and args.wait:
+            print('Waiting for {} to exist...'.format(caffemodel))
+            time.sleep(10)
+
+        net = caffe.Net(args.prototxt, caffemodel, caffe.TEST)
+        net.name = os.path.splitext(os.path.basename(caffemodel))[0]
+        nets.append(net)
 
     model_to_use = args.model_to_use
     proposal = args.proposal
@@ -116,4 +119,4 @@ if __name__ == '__main__':
     # DJDJ
     #imdb.evaluate_detections(None, output_dir)
     
-    test_net(net, imdb, proposal, proposal_file, output_dir)
+    test_net(nets, imdb, proposal, proposal_file, output_dir)
