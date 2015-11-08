@@ -25,6 +25,9 @@ import numpy.random as npr
 import cv2
 from sklearn import svm
 import os, sys
+import leveldb 
+import cPickle
+from utils.cython_bbox import bbox_overlaps
 
 class SVMTrainer(object):
     """
@@ -32,12 +35,14 @@ class SVMTrainer(object):
     and hyper-parameters of traditional R-CNN.
     """
 
-    def __init__(self, net, imdb):
+    def __init__(self, net, imdb, proposal_file):
         self.imdb = imdb
         self.net = net
         self.layer = 'fc7'
         self.hard_thresh = -1.0001
         self.neg_iou_thresh = 0.3
+
+        self.candidiate_db = leveldb.LevelDB(proposal_file)
 
         dim = net.params['cls_score'][0].data.shape[1]
         scale = self._get_feature_scale()
@@ -52,6 +57,7 @@ class SVMTrainer(object):
         roidb = self.imdb.roidb
         total_norm = 0.0
         count = 0.0
+        
         inds = npr.choice(xrange(self.imdb.num_images), size=num_images,
                           replace=False)
         for i_, i in enumerate(inds):
@@ -59,7 +65,14 @@ class SVMTrainer(object):
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             _t.tic()
-            scores, boxes = im_detect(self.net, im, roidb[i]['boxes'])
+            
+            data_id = imdb.image_index[i]
+            
+            proposals = self.candidiate_db.Get(data_id)
+            proposals = cPickle.loads(proposals)
+            proposals = proposals[:cfg.MAX_PROPOSAL_NO]
+            
+            scores, boxes = im_detect(self.net, im, proposals)
             _t.toc()
             feat = self.net.blobs[self.layer].data
             total_norm += np.sqrt((feat ** 2).sum(axis=1)).sum()
@@ -91,13 +104,15 @@ class SVMTrainer(object):
         _t = Timer()
         roidb = self.imdb.roidb
         num_images = len(roidb)
-        # num_images = 100
+        
+        # DJDJ
+        #num_images = 100
         for i in xrange(num_images):
             im = cv2.imread(self.imdb.image_path_at(i))
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             gt_inds = np.where(roidb[i]['gt_classes'] > 0)[0]
-            gt_boxes = roidb[i]['boxes'][gt_inds]
+            gt_boxes = roidb[i]['gt_boxes'][gt_inds]
             _t.tic()
             scores, boxes = im_detect(self.net, im, gt_boxes)
             _t.toc()
@@ -142,13 +157,35 @@ class SVMTrainer(object):
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             _t.tic()
-            scores, boxes = im_detect(self.net, im, roidb[i]['boxes'])
+            
+            data_id = imdb.image_index[i]
+            
+            proposals = self.candidiate_db.Get(data_id)
+            proposals = cPickle.loads(proposals)
+            proposals = proposals[:cfg.MAX_PROPOSAL_NO]
+
+            scores, boxes = im_detect(self.net, im, proposals)
+            
+            gt_boxes = roidb[i]['gt_boxes']
+            gt_classes = roidb[i]['gt_classes']
+            
+            num_boxes = boxes.shape[0]
+            num_classes = len(self.imdb.classes)
+            overlaps = np.zeros((num_boxes, num_classes), dtype=np.float32)
+            
+            bbox_gt_overlaps = bbox_overlaps(boxes.astype(np.float),
+                                        gt_boxes.astype(np.float))
+            argmaxes = bbox_gt_overlaps.argmax(axis=1)
+            maxes = bbox_gt_overlaps.max(axis=1)
+            I = np.where(maxes > 0)[0]
+            overlaps[I, gt_classes[argmaxes[I]]] = maxes[I]
+            
             _t.toc()
             feat = self.net.blobs[self.layer].data
             for j in xrange(1, self.imdb.num_classes):
                 hard_inds = \
                     np.where((scores[:, j] > self.hard_thresh) &
-                             (roidb[i]['gt_overlaps'][:, j].toarray().ravel() <
+                             (overlaps[:, j].ravel() <
                               self.neg_iou_thresh))[0]
                 if len(hard_inds) > 0:
                     hard_feat = feat[hard_inds, :].copy()
@@ -248,8 +285,13 @@ class SVMClassTrainer(object):
             print(('    {:d}: obj val: {:.3f} = {:.3f} '
                    '(pos) + {:.3f} (neg) + {:.3f} (reg)').format(i, *losses))
 
-        return ((w * self.feature_scale, b * self.feature_scale),
-                pos_scores, neg_scores)
+        # Sanity check
+        scores_ret = (
+                X * 1.0 / self.feature_scale).dot(w.T * self.feature_scale) + b
+        assert np.allclose(scores, scores_ret[:, 0], atol=1e-5), \
+                "Scores from returned model don't match decision function"
+
+        return ((w * self.feature_scale, b), pos_scores, neg_scores)
 
     def append_neg_and_retrain(self, feat=None, force=False):
         if feat is not None:
@@ -292,6 +334,9 @@ def parse_args():
     parser.add_argument('--imdb', dest='imdb_name',
                         help='dataset to train on',
                         default='voc_2007_trainval', type=str)
+    parser.add_argument('--proposal_file', dest='proposal_file',
+                        help='proposal file to use for test',
+                        default='', type=str)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -341,7 +386,7 @@ if __name__ == '__main__':
         imdb.append_flipped_roidb()
         print 'done'
 
-    SVMTrainer(net, imdb).train()
+    SVMTrainer(net, imdb, args.proposal_file).train()
 
     filename = '{}/{}.caffemodel'.format(out_dir, out)
     net.save(filename)
