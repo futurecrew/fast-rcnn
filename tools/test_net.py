@@ -51,6 +51,9 @@ def parse_args():
     parser.add_argument('--proposal_file', dest='proposal_file',
                         help='proposal file to use for test',
                         default='', type=str)
+    parser.add_argument('--classification_file', dest='classification_file',
+                        help='classification file to use for test',
+                        default=None, type=str)
     parser.add_argument('--output_dir', dest='output_dir',
                         help='output directory',
                         default='', type=str)
@@ -94,6 +97,7 @@ if __name__ == '__main__':
     model_to_use = args.model_to_use
     proposal = args.proposal
     proposal_file = args.proposal_file
+    classification_file = args.classification_file
     output_dir = args.output_dir
 
     if 'VGG16' in args.caffemodel.upper():
@@ -119,4 +123,4 @@ if __name__ == '__main__':
     # DJDJ
     #imdb.evaluate_detections(None, output_dir)
     
-    test_net(nets, imdb, proposal, proposal_file, output_dir)
+    test_net(nets, imdb, proposal, proposal_file, classification_file, output_dir)

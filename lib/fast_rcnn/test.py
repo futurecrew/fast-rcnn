@@ -164,7 +164,7 @@ def _clip_boxes(boxes, im_shape):
     boxes[:, 3::4] = np.minimum(boxes[:, 3::4], im_shape[0] - 1)
     return boxes
 
-def im_detect(net, im, boxes):
+def im_detect(net, im, boxes, svm_features=None):
     """Detect object classes in an image given object proposals.
 
     Arguments:
@@ -191,16 +191,29 @@ def im_detect(net, im, boxes):
                                             return_inverse=True)
             blobs['rois'] = blobs['rois'][index, :]
             boxes = boxes[index, :]
+            
+            if svm_features != None:
+                svm_features = svm_features[index, :]
     
         # reshape network inputs
         net.blobs['data'].reshape(*(blobs['data'].shape))
         net.blobs['rois'].reshape(*(blobs['rois'].shape))
-        blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+        if svm_features != None:
+            net.blobs['classifications'].reshape(*(svm_features.shape))
+            blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
+                                rois=blobs['rois'].astype(np.float32, copy=False),
+                                classifications=svm_features.astype(np.float32, copy=False))
+        else:
+            blobs_out = net.forward(data=blobs['data'].astype(np.float32, copy=False),
                                 rois=blobs['rois'].astype(np.float32, copy=False))
+            
         if cfg.TEST.SVM:
             # use the raw scores before softmax under the assumption they
             # were trained as linear SVMs
-            scores = net.blobs['cls_score'].data
+            if svm_features != None:
+                scores = net.blobs['cls_score_svm'].data
+            else:
+                scores = net.blobs['cls_score'].data
         else:
             # use softmax estimated probabilities
             scores = blobs_out['cls_prob']
@@ -307,7 +320,7 @@ def apply_nms(all_boxes, thresh):
             nms_boxes[cls_ind][im_ind] = dets[keep, :].copy()
     return nms_boxes
 
-def test_net(nets, imdb, proposal, proposal_file, output_dir):
+def test_net(nets, imdb, proposal, proposal_file, classification_file, output_dir):
     """Test a Fast R-CNN network on an image database."""
     
     num_images = len(imdb.image_index)
@@ -343,6 +356,11 @@ def test_net(nets, imdb, proposal, proposal_file, output_dir):
         os.makedirs(output_dir)
 
     candidiate_db = leveldb.LevelDB(proposal_file)
+    
+    if classification_file != None:
+        classification_db = leveldb.LevelDB(classification_file)
+    else:
+        classification_db = None
 
     # timers
     _t = {'im_detect' : Timer(), 'misc' : Timer()}
@@ -361,55 +379,75 @@ def test_net(nets, imdb, proposal, proposal_file, output_dir):
         proposals = cPickle.loads(proposals)
         proposals = proposals[:cfg.MAX_PROPOSAL_NO]
 
-        total_scores = np.zeros((len(nets), len(proposals), 201))
-        total_boxes = np.zeros((len(nets), len(proposals), 804))
+        if classification_db != None:
+            classifications = classification_db.Get(data_id + '.JPEG')
+            classifications = cPickle.loads(classifications)
+            classifications = np.tile(classifications, (len(proposals), 1))
+        else:
+            classifications = None
+
+        if 'voc' in imdb.name: 
+            total_scores = np.zeros((len(nets), len(proposals), 21))
+            total_boxes = np.zeros((len(nets), len(proposals), 84))
+        elif 'imagenet' in imdb.name: 
+            total_scores = np.zeros((len(nets), len(proposals), 201))
+            total_boxes = np.zeros((len(nets), len(proposals), 804))
         
-        net_no = 0
-        for net in nets:
-            scores, boxes = im_detect(net, im, proposals)
-            total_scores[net_no, :, :] = scores
-            total_boxes[net_no, :, :] = boxes
-            net_no += 1
-
-        scores = np.average(total_scores, axis=0)
-        boxes = np.average(total_boxes, axis=0)
-            
-        _t['im_detect'].toc()
+        if len(proposals) > 0:
+            net_no = 0
+            for net in nets:
+                scores, boxes = im_detect(net, im, proposals, classifications)
+                total_scores[net_no, :, :] = scores
+                total_boxes[net_no, :, :] = boxes
+                net_no += 1
     
-        _t['misc'].tic()
-        for j in xrange(1, imdb.num_classes):
-            inds = np.where((scores[:, j] >= base_thresh))[0]
-            cls_scores = scores[inds, j]
-            cls_boxes = boxes[inds, j*4:(j+1)*4]
-            
-            #cls_scores = scores[:, j]
-            #cls_boxes = boxes[:, j*4:(j+1)*4]
-            
-            top_inds = np.argsort(-cls_scores)[:max_per_image]
-            cls_scores = cls_scores[top_inds]
-            cls_boxes = cls_boxes[top_inds, :]
-            # push new scores onto the minheap
-            for val in cls_scores:
-                heapq.heappush(top_scores[j], val)
-            # if we've collected more than the max number of detection,
-            # then pop items off the minheap and update the class threshold
-            if len(top_scores[j]) > max_per_set:
-                while len(top_scores[j]) > max_per_set:
-                    heapq.heappop(top_scores[j])
-                thresh[j] = top_scores[j][0]
+            scores = np.average(total_scores, axis=0)
+            boxes = np.average(total_boxes, axis=0)
 
-            all_boxes[j][i] = \
-                    np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
+            _t['im_detect'].toc()
+        
+            _t['misc'].tic()
+            for j in xrange(1, imdb.num_classes):
+                if cfg.TEST.SVM == True:
+                    #inds = np.where((scores[:, j] > thresh[j]) &
+                    #        (roidb[i]['gt_classes'] == 0))[0]
+                    inds = np.where((scores[:, j] > thresh[j]))[0]
+                else:
+                    inds = np.where((scores[:, j] >= base_thresh))[0]
+                cls_scores = scores[inds, j]
+                cls_boxes = boxes[inds, j*4:(j+1)*4]
+                
+                #cls_scores = scores[:, j]
+                #cls_boxes = boxes[:, j*4:(j+1)*4]
+                
+                top_inds = np.argsort(-cls_scores)[:max_per_image]
+                cls_scores = cls_scores[top_inds]
+                cls_boxes = cls_boxes[top_inds, :]
+                # push new scores onto the minheap
+                for val in cls_scores:
+                    heapq.heappush(top_scores[j], val)
+                # if we've collected more than the max number of detection,
+                # then pop items off the minheap and update the class threshold
+                if len(top_scores[j]) > max_per_set:
+                    while len(top_scores[j]) > max_per_set:
+                        heapq.heappop(top_scores[j])
+                    thresh[j] = top_scores[j][0]
+    
+                all_boxes[j][i] = \
+                        np.hstack((cls_boxes, cls_scores[:, np.newaxis])) \
+                        .astype(np.float32, copy=False)
+    
+                if 0:
+                    keep = nms(all_boxes[j][i], 0.3)
+                    vis_detections(im, imdb.classes[j], all_boxes[j][i][keep, :])
+            _t['misc'].toc()
+    
+            print 'im_detect: {:d}/{:d} {:.3f}s' \
+                  .format(i + 1, num_images, _t['im_detect'].average_time)
+        else:
+            all_boxes[j][i] = np.zeros((1, 5)) \
                     .astype(np.float32, copy=False)
-
-            if 0:
-                keep = nms(all_boxes[j][i], 0.3)
-                vis_detections(im, imdb.classes[j], all_boxes[j][i][keep, :])
-        _t['misc'].toc()
-
-        print 'im_detect: {:d}/{:d} {:.3f}s' \
-              .format(i + 1, num_images, _t['im_detect'].average_time)
-
+                
     for j in xrange(1, imdb.num_classes):
         for i in xrange(num_images):
             inds = np.where(all_boxes[j][i][:, -1] > thresh[j])[0]

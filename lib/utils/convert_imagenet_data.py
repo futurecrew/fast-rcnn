@@ -29,6 +29,7 @@ class Converter:
 
         self.train_no = 0
         self.valid_no = 0
+        self.test_no = 0
         self.train_batch = leveldb.WriteBatch()
         self.valid_batch = leveldb.WriteBatch()
         self.test_batch = leveldb.WriteBatch()
@@ -155,7 +156,7 @@ class Converter:
             print 'here'
     
     
-    def insert_db(self, train_or_valid, image, label, features, channel_no, inverse):
+    def insert_db(self, mode, image, label, features, channel_no, inverse):
         if inverse:
             image_ubyte = 255 - img_as_ubyte(image)
         else:
@@ -176,16 +177,20 @@ class Converter:
         else:
             self.datum.data = image_string
             
-        self.datum.label = int(label)                
+        if label != None:
+            self.datum.label = int(label)                
     
         serialized = self.datum.SerializeToString()
         
-        if train_or_valid == 'train':
+        if mode == 'train':
             self.train_batch.Put("%08d" % self.train_no, serialized)                    
             self.train_no += 1
-        else:
+        elif mode == 'valid':
             self.valid_batch.Put("%08d" % self.valid_no, serialized)                    
             self.valid_no += 1
+        elif mode == 'test':
+            self.test_batch.Put("%08d" % self.test_no, serialized)                    
+            self.test_no += 1
     
     def getLargestRegion(self, props, labelmap, imagethres):
             
@@ -280,16 +285,19 @@ class Converter:
         return feature_array.tostring() 
 
              
-    def convert_data_to_db(self, train_data_folder, valid_data_folder, min_pixel, 
-                       train_db_name, valid_db_name, 
-                       train_list_file, valid_list_file,
-                       channel_no, preserve_ar):
+    def convert_data_to_db(self, train_data_folder, valid_data_folder, test_data_folder, 
+                           min_pixel, 
+                           train_db_name, valid_db_name, test_db_name,
+                           train_list_file, valid_list_file, test_list_file,
+                           channel_no, preserve_ar):
         
-        self.remove_folder(train_db_name)
+        #self.remove_folder(train_db_name)
         #self.remove_folder(valid_db_name)
+        self.remove_folder(test_db_name)
                 
-        self.train_db = leveldb.LevelDB(train_db_name)
+        #self.train_db = leveldb.LevelDB(train_db_name)
         #self.valid_db = leveldb.LevelDB(valid_db_name)
+        self.test_db = leveldb.LevelDB(test_db_name)
     
         self.datum = caffe.proto.caffe_pb2.Datum()
         self.datum.channels = channel_no
@@ -299,11 +307,13 @@ class Converter:
         print "convert_train_data"
         print "train_db_name : %s" % train_db_name
         print "valid_db_name : %s" % valid_db_name
+        print "test_db_name : %s" % test_db_name
         print "channel_no : %s" % channel_no
     
         #modes = ['train', 'valid']
-        modes = ['train']
+        #modes = ['train']
         #modes = ['valid']
+        modes = ['test']
         
         start_time = time.time()
         
@@ -311,9 +321,15 @@ class Converter:
             if mode == 'train':
                 image_list_file = open(train_list_file, 'rb')
                 data_folder = train_data_folder
-            else: 
+            elif mode == 'valid':
                 image_list_file = open(valid_list_file, 'rb')
                 data_folder = valid_data_folder
+            elif mode == 'test':
+                image_list_file = open(test_list_file, 'rb')
+                data_folder = test_data_folder
+            else:
+                print 'not supported mode : %s' % mode
+                return
                 
             lines = image_list_file.readlines()
             image_list_file.close()
@@ -324,37 +340,16 @@ class Converter:
             print 'processing %s' % mode
             
             for i, line in enumerate(lines):
-                parsed = line.split('\t')
-                label = parsed[1]
-                file_path = parsed[0]
-                file_path = file_path.replace('\r', '')
-                file_path = file_path.replace('\n', '')
-                
-                """
-                org_image = Image.open(data_folder + '/' + file_path)                
-                org_size = org_image.size
-                
-                if preserve_ar == 'preserve':
-                    if org_size[0] > org_size[1]:
-                        hpercent = (min_pixel/float(org_image.size[1]))
-                        wsize = int((float(org_image.size[0])*float(hpercent)))
-                        image_width = wsize
-                        image_height = min_pixel
-                    else:
-                        wpercent = (min_pixel/float(org_image.size[0]))
-                        hsize = int((float(org_image.size[1])*float(wpercent)))
-                        image_width = min_pixel
-                        image_height = hsize
-                elif preserve_ar == 'ignore':
-                    image_width = min_pixel
-                    image_height = min_pixel
-
-                if org_image.mode != 'RGB':                    
-                    #print org_image.mode 
-                    org_image = org_image.convert('RGB')
-                
-                image = org_image.resize((image_width, image_height), Image.ANTIALIAS)
-                """
+                if mode == 'test':
+                    parsed = line.split(' ')
+                    file_path = parsed[0] + '.JPEG'
+                    label = None
+                else:
+                    parsed = line.split('\t')
+                    label = parsed[1]
+                    file_path = parsed[0]
+                    file_path = file_path.replace('\r', '')
+                    file_path = file_path.replace('\n', '')
 
                 org_image = cv2.imread(data_folder + '/' + file_path)                
                 org_size = org_image.shape
@@ -398,14 +393,22 @@ class Converter:
                     del self.valid_batch
                     self.valid_batch = leveldb.WriteBatch()
                     print 'Processed %i valid images.' % self.valid_no
+    
+                if mode == 'test' and self.test_no > 0 and self.test_no % 1000 == 0:
+                    self.test_db.Write(self.test_batch, sync = True)
+                    del self.test_batch
+                    self.test_batch = leveldb.WriteBatch()
+                    print 'Processed %i test images.' % self.test_no
 
         # Write last batch of images
         if self.train_no % 1000 != 0:
             self.train_db.Write(self.train_batch, sync = True)
         if self.valid_no % 1000 != 0:
             self.valid_db.Write(self.valid_batch, sync = True)
+        if self.test_no % 1000 != 0:
+            self.test_db.Write(self.test_batch, sync = True)
     
-        print 'Processed %d train, %d valid' % (self.train_no, self.valid_no)
+        print 'Processed %d train, %d valid, %d test' % (self.train_no, self.valid_no, self.test_no)
     
     def make_mean_var_file(self, train_db_name, mean_output_file, var_output_file, width, height):
         db = leveldb.LevelDB(train_db_name)
@@ -591,7 +594,7 @@ if __name__ == '__main__':
     valid_data_folder = base_folder + '/ILSVRC2012_img_val_200'
     #train_data_folder = base_folder + '/ILSVRC2012_img_train_small'
     #valid_data_folder = base_folder + '/ILSVRC2012_img_val_small'
-    test_data_folder = base_folder + '/ILSVRC2012_img_test'
+    test_data_folder = base_folder + '/ILSVRC2015_DET_test'
     valid_label_file = base_folder + '/ILSVRC2015_devkit/data/ILSVRC2015_clsloc_validation_ground_truth_200.txt'
     label_id_mapping_file = base_folder + '/ILSVRC2015_devkit/data/map_det.txt'
     output_folder = base_folder
@@ -634,6 +637,7 @@ if __name__ == '__main__':
     test_output_pickle_path = output_folder + "/pickles/" + inverse_string + "/" + test_data_folder.split("/")[-1]
     train_list_file = '%s/db/train_list.txt' % (output_folder)
     valid_list_file = '%s/db/valid_list.txt' % (output_folder)
+    test_list_file = base_folder + '/ILSVRC2015_devkit/data/det_lists/test.txt'
     
     
     if not os.path.exists(output_folder):
@@ -665,14 +669,17 @@ if __name__ == '__main__':
 
     converter = Converter(label_id_mapping_file)
 
+    """
     converter.generate_data_list(train_data_folder, valid_data_folder, 
                                   train_list_file, valid_list_file, 
                                   valid_label_file, shuffle_in_folder)
+    """
 
-    converter.convert_data_to_db(train_data_folder, valid_data_folder, min_pixel, 
-                       train_db_name, valid_db_name, 
-                       train_list_file, valid_list_file,
-                       channel_no, preserve_ar)
+    converter.convert_data_to_db(train_data_folder, valid_data_folder, test_data_folder,
+                                 min_pixel, 
+                                 train_db_name, valid_db_name, test_db_name,
+                                 train_list_file, valid_list_file, test_list_file,
+                                 channel_no, preserve_ar)
 
     
 

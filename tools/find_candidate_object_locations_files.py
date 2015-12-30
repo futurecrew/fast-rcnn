@@ -521,7 +521,18 @@ if __name__ == '__main__':
     data_folder = args.data_folder
     data_ext = args.data_ext
     
-    if 'voc_2007' in args.imdb_name:
+    if 'voc_2007_2012' in args.imdb_name:
+        if args.data_type == 'trainval':
+            gt = 'data/cache/voc_2007_2012_trainval_gt_roidb.pkl'
+            data_list = '/home/dj/big/data/VOCdevkit/VOC2007_2012/ImageSets/Main/trainval.txt'
+            test_data = 'voc_2007_2012_trainval'
+        elif args.data_type == 'test':
+            gt = 'data/cache/voc_2007_2012_test_gt_roidb.pkl'
+            data_list = '/home/dj/big/data/VOCdevkit/VOC2007_2012/ImageSets/Main/test.txt'
+            test_data = 'voc_2007_2012_test'
+        data_folder = '/home/dj/big/data/VOCdevkit/VOC2007_2012/JPEGImages/'
+        data_ext = 'jpg'
+    elif 'voc_2007' in args.imdb_name:
         if args.data_type == 'trainval':
             gt = 'data/cache/voc_2007_trainval_gt_roidb.pkl'
             data_list = '/home/dj/big/data/VOCdevkit/VOC2007/ImageSets/Main/trainval.txt'

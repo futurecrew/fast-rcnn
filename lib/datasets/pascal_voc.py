@@ -132,7 +132,7 @@ class pascal_voc(datasets.imdb):
             print '{} ss roidb loaded from {}'.format(self.name, cache_file)
             return roidb
 
-        if int(self._year) == 2007 or self._image_set != 'test':
+        if self._image_set != 'test':
             gt_roidb = self.gt_roidb()
             ss_roidb = self._load_selective_search_roidb(gt_roidb)
             roidb = datasets.imdb.merge_roidbs(gt_roidb, ss_roidb)
@@ -205,7 +205,7 @@ class pascal_voc(datasets.imdb):
         Return the database of rpn regions of interest.
         Ground-truth ROIs are also included.
         """
-        if int(self._year) == 2007 or self._image_set != 'test':
+        if self._image_set != 'test':
             gt_roidb = self.gt_roidb()
             
             roidb = gt_roidb

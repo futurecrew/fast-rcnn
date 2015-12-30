@@ -89,6 +89,7 @@ if __name__ == '__main__':
     input_scale = None
     raw_scale = 255.0
     channel_swap = (2, 1, 0)
+    image_batch = 10
     
     # Make classifier.
     classifier = caffe.Classifier(args.prototxt, args.caffemodel,

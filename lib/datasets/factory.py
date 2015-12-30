@@ -24,7 +24,7 @@ def _selective_search_IJCV_top_k(split, year, top_k):
 
 def _init_imdb(model_to_use, proposal, proposal_file):
     # Set up voc_<year>_<split> using selective search "fast" mode
-    for year in ['2007', '2012']:
+    for year in ['2007', '2012', '2007_2012']:
         for split in ['train', 'val', 'trainval', 'test']:
             name = 'voc_{}_{}'.format(year, split)
             __sets[name] = (lambda split=split, year=year:
@@ -39,7 +39,7 @@ def _init_imdb(model_to_use, proposal, proposal_file):
                 __sets[name] = (lambda split=split, year=year, top_k=top_k:
                         _selective_search_IJCV_top_k(split, year, top_k))
                 
-    for split in ['train', 'val', 'val_2000', 'test']:
+    for split in ['train', 'val', 'val_10', 'val_2000', 'test']:
         name = 'imagenet_{}'.format(split)
         __sets[name] = (lambda split=split:
                 datasets.imagenet(split, model_to_use, proposal, proposal_file))

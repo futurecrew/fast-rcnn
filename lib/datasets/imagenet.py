@@ -8,6 +8,7 @@
 import datasets
 import datasets.pascal_voc
 import os
+import shutil
 import datasets.imdb
 import xml.dom.minidom as minidom
 import numpy as np
@@ -188,7 +189,10 @@ class imagenet(datasets.pascal_voc):
 
         This function loads/saves from/to a cache file to speed up future calls.
         """
-        return self.gt_roidb()
+        if self._image_set != 'test':
+            return self.gt_roidb()
+        else:
+            return None
 
         """        
         cache_file = os.path.join(self.cache_path,
@@ -354,7 +358,7 @@ class imagenet(datasets.pascal_voc):
                 'flipped' : False}
 
 
-    def _write_imagenet_results_file(self, all_boxes):
+    def _write_imagenet_results_file(self, all_boxes, submission_file):
         use_salt = self.config['use_salt']
         comp_id = 'comp4'
         if use_salt:
@@ -372,15 +376,19 @@ class imagenet(datasets.pascal_voc):
                 name, id = line.split()
                 data_name_id_dict[name] = id                
         
-        print 'Writing imagenet results file'
         filename = path + comp_id + '_' + 'det_' + self._image_set + '.txt'
+            
+        print 'Writing imagenet results file : %s' % filename
         with open(filename, 'wt') as f:
             for im_ind, index in enumerate(self.image_index):
                 for cls_ind, cls in enumerate(self.classes):
                     if cls == '__background__':
                         continue
                     
-                    dets = all_boxes[cls_ind][im_ind]
+                    try:
+                        dets = all_boxes[cls_ind][im_ind]
+                    except:
+                        print 'haha'
                     if dets == []:
                         continue
                     
@@ -391,6 +399,9 @@ class imagenet(datasets.pascal_voc):
                                 format(index_id, cls_ind, dets[k, -1],
                                        dets[k, 0], dets[k, 1],
                                        dets[k, 2], dets[k, 3]))
+
+        if submission_file != '':
+            shutil.copyfile(filename, submission_file)
                         
         # Make none to save memory
         all_boxes[:] = []
@@ -435,9 +446,10 @@ class imagenet(datasets.pascal_voc):
         """
 
 
-    def evaluate_detections(self, all_boxes, output_dir):
-        comp_id = self._write_imagenet_results_file(all_boxes)
-        self._do_matlab_eval(comp_id, output_dir)
+    def evaluate_detections(self, all_boxes, output_dir, submission_file=''):
+        comp_id = self._write_imagenet_results_file(all_boxes, submission_file)
+        if self._image_set != 'test':
+            self._do_matlab_eval(comp_id, output_dir)
 
     def competition_mode(self, on):
         if on:

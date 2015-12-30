@@ -35,22 +35,33 @@ class SVMTrainer(object):
     and hyper-parameters of traditional R-CNN.
     """
 
-    def __init__(self, net, imdb, proposal_file):
+    def __init__(self, net, imdb, proposal_file, classification_file=None, train_no=0):
         self.imdb = imdb
         self.net = net
-        self.layer = 'fc7'
+        self.train_no = train_no
+        if classification_file != None:
+            self.layer = 'fc7_concat'
+            self.cls_score_name = 'cls_score_svm'
+        else:
+            self.layer = 'fc7'
+            self.cls_score_name = 'cls_score'
         self.hard_thresh = -1.0001
         self.neg_iou_thresh = 0.3
 
         self.candidiate_db = leveldb.LevelDB(proposal_file)
+        if classification_file != None:
+            self.classification_db = leveldb.LevelDB(classification_file)
+        else:
+            self.classification_db = None
 
-        dim = net.params['cls_score'][0].data.shape[1]
+        dim = net.params[self.cls_score_name][0].data.shape[1]
         scale = self._get_feature_scale()
         print('Feature dim: {}'.format(dim))
         print('Feature scale: {:.3f}'.format(scale))
         self.trainers = [SVMClassTrainer(cls, dim, feature_scale=scale)
                          for cls in imdb.classes]
 
+    # DJDJ
     def _get_feature_scale(self, num_images=100):
         TARGET_NORM = 20.0 # Magic value from traditional R-CNN
         _t = Timer()
@@ -72,7 +83,19 @@ class SVMTrainer(object):
             proposals = cPickle.loads(proposals)
             proposals = proposals[:cfg.MAX_PROPOSAL_NO]
             
-            scores, boxes = im_detect(self.net, im, proposals)
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:       
+                boxes = np.vstack((roidb[i]['gt_boxes'], proposals))
+            else:
+                boxes = proposals
+            
+            if self.classification_db != None:
+                classifications = self.classification_db.Get(data_id + '.JPEG')
+                classifications = cPickle.loads(classifications)
+                classifications = np.tile(classifications, (len(boxes), 1))
+            else:
+                classifications = None
+
+            scores, boxes = im_detect(self.net, im, boxes, classifications)
             _t.toc()
             feat = self.net.blobs[self.layer].data
             total_norm += np.sqrt((feat ** 2).sum(axis=1)).sum()
@@ -105,16 +128,29 @@ class SVMTrainer(object):
         roidb = self.imdb.roidb
         num_images = len(roidb)
         
-        # DJDJ
-        #num_images = 100
+        if self.train_no > 0:
+            num_images = self.train_no
+            
+        print 'start reading %s pos examples' % num_images
+            
         for i in xrange(num_images):
-            im = cv2.imread(self.imdb.image_path_at(i))
+            image_path = self.imdb.image_path_at(i)
+            im = cv2.imread(image_path)
             if roidb[i]['flipped']:
                 im = im[:, ::-1, :]
             gt_inds = np.where(roidb[i]['gt_classes'] > 0)[0]
             gt_boxes = roidb[i]['gt_boxes'][gt_inds]
             _t.tic()
-            scores, boxes = im_detect(self.net, im, gt_boxes)
+
+            if self.classification_db != None:
+                data_id = image_path.split('/')[-1]
+                classifications = self.classification_db.Get(data_id)
+                classifications = cPickle.loads(classifications)
+                classifications = np.tile(classifications, (len(gt_boxes), 1))
+            else:
+                classifications = None
+
+            scores, boxes = im_detect(self.net, im, gt_boxes, classifications)
             _t.toc()
             feat = self.net.blobs[self.layer].data
             for j in xrange(1, self.imdb.num_classes):
@@ -125,11 +161,11 @@ class SVMTrainer(object):
 
             print 'get_pos_examples: {:d}/{:d} {:.3f}s' \
                   .format(i + 1, len(roidb), _t.average_time)
-
+                  
     def initialize_net(self):
         # Start all SVM parameters at zero
-        self.net.params['cls_score'][0].data[...] = 0
-        self.net.params['cls_score'][1].data[...] = 0
+        self.net.params[self.cls_score_name][0].data[...] = 0
+        self.net.params[self.cls_score_name][1].data[...] = 0
 
         # Initialize SVMs in a smart way. Not doing this because its such
         # a good initialization that we might not learn something close to
@@ -144,14 +180,19 @@ class SVMTrainer(object):
 #        self.net.params['cls_score'][1].data[0] = 0
 
     def update_net(self, cls_ind, w, b):
-        self.net.params['cls_score'][0].data[cls_ind, :] = w
-        self.net.params['cls_score'][1].data[cls_ind] = b
+        self.net.params[self.cls_score_name][0].data[cls_ind, :] = w
+        self.net.params[self.cls_score_name][1].data[cls_ind] = b
 
     def train_with_hard_negatives(self):
         _t = Timer()
         roidb = self.imdb.roidb
         num_images = len(roidb)
-        # num_images = 100
+        
+        if self.train_no > 0:
+            num_images = self.train_no
+            
+        print 'start train with %s images' % num_images
+
         for i in xrange(num_images):
             im = cv2.imread(self.imdb.image_path_at(i))
             if roidb[i]['flipped']:
@@ -164,7 +205,19 @@ class SVMTrainer(object):
             proposals = cPickle.loads(proposals)
             proposals = proposals[:cfg.MAX_PROPOSAL_NO]
 
-            scores, boxes = im_detect(self.net, im, proposals)
+            if cfg.TRAIN.LAZY_PREPARING_ROIDB == True:       
+                boxes = np.vstack((roidb[i]['gt_boxes'], proposals))
+            else:
+                boxes = proposals
+
+            if self.classification_db != None:
+                classifications = self.classification_db.Get(data_id + '.JPEG')
+                classifications = cPickle.loads(classifications)
+                classifications = np.tile(classifications, (len(boxes), 1))
+            else:
+                classifications = None
+
+            scores, boxes = im_detect(self.net, im, boxes, classifications)
             
             gt_boxes = roidb[i]['gt_boxes']
             gt_classes = roidb[i]['gt_classes']
@@ -187,8 +240,13 @@ class SVMTrainer(object):
                     np.where((scores[:, j] > self.hard_thresh) &
                              (overlaps[:, j].ravel() <
                               self.neg_iou_thresh))[0]
+                              
+                aa = roidb[i]['gt_overlaps'].toarray()[:, j].ravel()
+                bb = overlaps[:, j].ravel()
+                
                 if len(hard_inds) > 0:
                     hard_feat = feat[hard_inds, :].copy()
+                    
                     new_w_b = \
                         self.trainers[j].append_neg_and_retrain(feat=hard_feat)
                     if new_w_b is not None:
@@ -337,6 +395,11 @@ def parse_args():
     parser.add_argument('--proposal_file', dest='proposal_file',
                         help='proposal file to use for test',
                         default='', type=str)
+    parser.add_argument('--classification_file', dest='classification_file',
+                        help='classification file to use for test',
+                        default=None, type=str)
+    parser.add_argument('--train_no', dest='train_no', help='train data no to use',
+                        default=0, type=int)
 
     if len(sys.argv) == 1:
         parser.print_help()
@@ -372,6 +435,7 @@ if __name__ == '__main__':
     caffe.set_mode_gpu()
     if args.gpu_id is not None:
         caffe.set_device(args.gpu_id)
+    
     net = caffe.Net(args.prototxt, args.caffemodel, caffe.TEST)
     net.name = os.path.splitext(os.path.basename(args.caffemodel))[0]
     out = os.path.splitext(os.path.basename(args.caffemodel))[0] + '_svm'
@@ -386,7 +450,7 @@ if __name__ == '__main__':
         imdb.append_flipped_roidb()
         print 'done'
 
-    SVMTrainer(net, imdb, args.proposal_file).train()
+    SVMTrainer(net, imdb, args.proposal_file, args.classification_file, args.train_no).train()
 
     filename = '{}/{}.caffemodel'.format(out_dir, out)
     net.save(filename)
