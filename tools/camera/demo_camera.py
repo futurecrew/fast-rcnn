@@ -6,10 +6,11 @@ import wx
 import random
 import  cStringIO
 import thread
+import numpy as np
 
 import _init_paths
 from web_server import WebService
-from detect_engine import Detector
+from detect_engine import Detector, CLASSES
 
 # This has been set up to optionally use the wx.BufferedDC if
 # USE_BUFFERED_DC is True, it will be used. Otherwise, it uses the raw
@@ -102,31 +103,91 @@ class DrawWindow(BufferedWindow):
         ## Any data the Draw() function needs must be initialized before
         ## calling BufferedWindow.__init__, as it will call the Draw
         ## function.
+        self.file_name = None
         self.DrawData = {}
         BufferedWindow.__init__(self, *args, **kwargs)
 
+    def GetColorText(self, key):
+        text = CLASSES[key]
+        if key == 1:
+            color = 'BLUE'
+        elif key == 2:
+            color = 'RED'
+        elif key == 3:
+            color = 'GREY'
+        elif key == 4:
+            color = 'BLACK'
+        elif key == 5:
+            color = 'BROWN'
+        elif key == 6:
+            color = 'CYAN'
+        elif key == 7:
+            color = 'GREEN'
+        elif key == 8:
+            color = 'MAGENTA'
+        elif key == 9:
+            color = 'ORANGE'
+        elif key == 10:
+            color = 'YELLOW'
+        elif key == 11:
+            color = 'PINK'
+        elif key == 12:
+            color = 'PURPLE'
+        elif key == 13:
+            color = 'VIOLET'
+        elif key == 14:
+            color = 'PLUM'
+        elif key == 15:
+            color = 'AQUAMARINE'
+        elif key == 16:
+            color = 'GOLD'
+        elif key == 17:
+            color = 'KHAKI'
+        elif key == 18:
+            color = 'NAVY'
+        elif key == 19:
+            color = 'ORCHID'
+        elif key == 20:
+            color = 'CORAL'
+            
+        return color, text
+    
     def Draw(self, dc):
-        dc.SetBackground( wx.Brush("White") )
+        #dc.SetBackground( wx.Brush("White") )
         dc.Clear() # make sure you clear the bitmap!
 
-        imageFile = '/home/dj/big/haha.jpeg'
-        data = open(imageFile, "rb").read()
-        # convert to a data stream
-        stream = cStringIO.StringIO(data)
-        # convert to a bitmap
-        bmp = wx.BitmapFromImage( wx.ImageFromStream( stream ))
-        # show the bitmap, (5, 5) are upper left corner coordinates
-        #wx.StaticBitmap(self, -1, bmp, (5, 5))
+        #self.file_name = '/home/dj/big/haha.jpeg'
         
-        dc.DrawBitmap(bmp, 0, 0, True)
+        #print 'DrawWindow.Draw() self.file_name : %s' % self.file_name
         
-        # Here's the actual drawing code.
+        if self.file_name != None:
+            data = open(self.file_name, "rb").read()
+            # convert to a data stream
+            stream = cStringIO.StringIO(data)
+            # convert to a bitmap
+            bmp = wx.BitmapFromImage( wx.ImageFromStream( stream ))
+            # show the bitmap, (5, 5) are upper left corner coordinates
+            #wx.StaticBitmap(self, -1, bmp, (5, 5))
+            
+            dc.DrawBitmap(bmp, 0, 0, True)
+        
+        
+
         for key, data in self.DrawData.items():
-            if key == "Rectangles":
-                dc.SetBrush(wx.BLUE_BRUSH)
-                dc.SetPen(wx.Pen('VIOLET', 4))
-                for r in data:
-                    dc.DrawRectangle(*r)
+            color, text = self.GetColorText(key)
+            
+            for r in data:
+                dc.SetBrush(wx.Brush('WHITE')) 
+                dc.SetPen(wx.Pen('WHITE', 1))
+                dc.DrawRectangle(r[0], r[1] - 20, 100, 20)
+                dc.SetTextForeground('BLACK')
+                dc.DrawText(text, r[0], r[1] - 20)
+                
+                dc.SetBrush(wx.TRANSPARENT_BRUSH) 
+                dc.SetPen(wx.Pen(color, 3))
+                dc.DrawRectangle(*r)
+                    
+            """
             elif key == "Ellipses":
                 dc.SetBrush(wx.Brush("GREEN YELLOW"))
                 dc.SetPen(wx.Pen('CADET BLUE', 2))
@@ -137,12 +198,14 @@ class DrawWindow(BufferedWindow):
                 dc.SetPen(wx.Pen('VIOLET RED', 4))
                 for r in data:
                     dc.DrawPolygon(r)
+            """
 
 
 class TestFrame(wx.Frame):
     def __init__(self, parent=None):
         wx.Frame.__init__(self, parent,
                           size = (1280, 960),
+                          #size = (640, 480),
                           title="Double Buffered Test",
                           style=wx.DEFAULT_FRAME_STYLE)
 
@@ -167,7 +230,7 @@ class TestFrame(wx.Frame):
         self.Show()
         # Initialize a drawing -- it has to be done after Show() is called
         #   so that the Windows has teh right size.
-        self.NewDrawing()
+        #self.NewDrawing()
 
     def OnQuit(self,event):
         self.Close(True)
@@ -225,26 +288,73 @@ class TestFrame(wx.Frame):
 
 class DemoApp(wx.App):
     def OnInit(self):
-        frame = TestFrame()
-        self.SetTopWindow(frame)
+        self.in_progress = False
+        self.frame = TestFrame()
+        self.SetTopWindow(self.frame)
 
         return True
 
     def process_data(self, file_name):
-        result = self.detector.detect(file_name)
+        if self.in_progress == True:
+            return None
         
-        print 'process_data'
-        print result
+        self.in_progress = True
+
+        detect_result = self.detector.detect(file_name)
         
-    def gogo(self):
+        #print 'detect_result : %s' % detect_result
+        
+        rects = {}
+
+        """
+        # make some random rectangles
+        MaxX, MaxY = self.frame.Window.GetClientSizeTuple()
+        l = []
+        for i in range(5):
+            w = random.randint(1,MaxX/2)
+            h = random.randint(1,MaxY/2)
+            x = random.randint(1,MaxX-w)
+            y = random.randint(1,MaxY-h)
+            l.append( (x,y,w,h) )
+        """
+        
+        l = []
+        for key in detect_result.keys():
+            if key == 0:        # background
+                continue
+            
+            values = detect_result[key]
+            inds = np.where(values[:, -1]> self.conf_thresh)[0]
+            
+            if len(inds) == 0:
+                continue
+            
+            for ind in inds:
+                one_rect = values[ind]
+                l.append((one_rect[0], one_rect[1], one_rect[2]-one_rect[0], one_rect[3]-one_rect[1])) 
+        
+            rects[key] = l
+
+        self.frame.Window.DrawData = rects
+        self.frame.Window.file_name = file_name
+        wx.CallAfter(self.frame.Window.UpdateDrawing)
+
+        self.in_progress = False
+        
+    def gogo(self, ip, port, conf_thresh):
         self.detector = Detector()
         self.detector.initialize(app)
+        self.conf_thresh = conf_thresh
         
         webService = WebService()
-        thread.start_new_thread(webService.initialize, ("192.168.0.18", 8080, app))
+        thread.start_new_thread(webService.initialize, (ip, port, app))
         
         app.MainLoop()
             
 if __name__ == "__main__":
+    IP = "192.168.0.18"
+    PORT = 8080
+    CONF_THRESH = 0.8
+
     app = DemoApp(0)
-    app.gogo()
+    app.gogo(IP, PORT, CONF_THRESH)

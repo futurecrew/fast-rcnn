@@ -36,9 +36,13 @@ NETS = {'vgg16': ('VGG16',
 
 class Detector(object):
     def detect(self, image_name, mixed=True):
+        
+        # DJDJ
         # Load the demo image
-        im_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo', image_name)
-        im = cv2.imread(im_file)
+        #im_file = os.path.join(cfg.ROOT_DIR, 'data', 'demo', image_name)
+        #im = cv2.imread(im_file)
+        
+        im = cv2.imread(image_name)
     
         # Detect all object classes and regress object bounds
         for i in range(1):
@@ -70,10 +74,9 @@ class Detector(object):
             
             dets = dets[keep, :]
             result[cls_ind] = dets
-            print 'All {} detections with p({} | box) >= {:.1f}'.format(cls, cls,
-                                                                        CONF_THRESH)
+            #print 'All {} detections with p({} | box) >= {:.1f}'.format(cls, cls, CONF_THRESH)
             #vis_detections(im, cls, dets, thresh=CONF_THRESH)
-        print ('nms took {:.3f}s').format(timer.total_time)
+        #print ('nms took {:.3f}s').format(timer.total_time)
         
         return result        
                 

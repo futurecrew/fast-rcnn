@@ -1,12 +1,15 @@
 #!/usr/bin/python
 
 import SimpleHTTPServer
+from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
+from SocketServer import ThreadingMixIn
 import SocketServer
 import logging
 import cgi
 import sys
 import shutil
 import os
+import time
 
 parent_app = None
 directory = 'pics'
@@ -20,35 +23,37 @@ class WebService():
     def initialize(self, I, port=8080, app=None):
         global parent_app 
         parent_app = app
-        handler = ServerHandler
-        httpd = SocketServer.TCPServer(("", port), handler)
+        #httpd = SocketServer.TCPServer(("", port), ServerHandler)
+        server = ThreadedHTTPServer(('192.168.0.18', 8080), ServerHandler)
+        
         
         print "Serving at: http://%s:%s" % (I , port)
-        httpd.serve_forever()
+        #httpd.serve_forever()
+        server.serve_forever()
+        
+        
+class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
+    pass
         
 
 class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
-    
-    def __init__(self):
-        SimpleHTTPServer.SimpleHTTPRequestHandler()
-
     def do_GET(self):
         logging.warning("======= GET STARTED =======")
         logging.warning(self.headers)
         SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
     def do_POST(self):
-        logging.warning("======= POST STARTED =======")
-        logging.warning(self.headers)
+        #logging.warning("======= POST STARTED =======")
+        #logging.warning(self.headers)
         form = cgi.FieldStorage(
             fp=self.rfile,
             headers=self.headers,
             environ={'REQUEST_METHOD':'POST',
                      'CONTENT_TYPE':self.headers['Content-Type'],
                      })
-        logging.warning("======= POST VALUES =======")
+        #logging.warning("======= POST VALUES =======")
         
-        print 'Content-Length : %s' % self.headers['Content-Length']
+        #print 'Content-Length : %s' % self.headers['Content-Length']
 
         for item in form.list:
             if item.name == 'name':
@@ -66,7 +71,6 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         self.send_header("Content-Length", len(content))
         self.end_headers()
         
-        print 'ret'
         #print(self.rfile.read().decode("UTF-8"))
         
         self.wfile.write(content)
@@ -74,8 +78,6 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         global parent_app
         if parent_app != None:
             parent_app.process_data(directory + '/' + file_name)
-            
-        print 'end'
         
 if __name__ == '__main__':
     WebService().initialize("192.168.0.18", 8080)
