@@ -205,7 +205,6 @@ class TestFrame(wx.Frame):
     def __init__(self, parent=None):
         wx.Frame.__init__(self, parent,
                           size = (1280, 960),
-                          #size = (640, 480),
                           title="Double Buffered Test",
                           style=wx.DEFAULT_FRAME_STYLE)
 
@@ -236,7 +235,6 @@ class TestFrame(wx.Frame):
         self.Close(True)
         
     def NewDrawing(self, event=None):
-        self.Window.DrawData = self.MakeNewData()
         self.Window.UpdateDrawing()
 
     def SaveToFile(self,event):
@@ -248,43 +246,6 @@ class TestFrame(wx.Frame):
         if dlg.ShowModal() == wx.ID_OK:
             self.Window.SaveToFile(dlg.GetPath(), wx.BITMAP_TYPE_PNG)
         dlg.Destroy()
-
-    def MakeNewData(self):
-        ## This method makes some random data to draw things with.
-        MaxX, MaxY = self.Window.GetClientSizeTuple()
-        DrawData = {}
-
-        # make some random rectangles
-        l = []
-        for i in range(5):
-            w = random.randint(1,MaxX/2)
-            h = random.randint(1,MaxY/2)
-            x = random.randint(1,MaxX-w)
-            y = random.randint(1,MaxY-h)
-            l.append( (x,y,w,h) )
-        DrawData["Rectangles"] = l
-
-        # make some random ellipses
-        l = []
-        for i in range(5):
-            w = random.randint(1,MaxX/2)
-            h = random.randint(1,MaxY/2)
-            x = random.randint(1,MaxX-w)
-            y = random.randint(1,MaxY-h)
-            l.append( (x,y,w,h) )
-        DrawData["Ellipses"] = l
-
-        # Polygons
-        l = []
-        for i in range(3):
-            points = []
-            for j in range(random.randint(3,8)):
-                point = (random.randint(1,MaxX),random.randint(1,MaxY))
-                points.append(point)
-            l.append(points)
-        DrawData["Polygons"] = l
-
-        return DrawData
 
 class DemoApp(wx.App):
     def OnInit(self):
@@ -305,19 +266,6 @@ class DemoApp(wx.App):
         #print 'detect_result : %s' % detect_result
         
         rects = {}
-
-        """
-        # make some random rectangles
-        MaxX, MaxY = self.frame.Window.GetClientSizeTuple()
-        l = []
-        for i in range(5):
-            w = random.randint(1,MaxX/2)
-            h = random.randint(1,MaxY/2)
-            x = random.randint(1,MaxX-w)
-            y = random.randint(1,MaxY-h)
-            l.append( (x,y,w,h) )
-        """
-        
         l = []
         for key in detect_result.keys():
             if key == 0:        # background
