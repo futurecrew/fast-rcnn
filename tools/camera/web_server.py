@@ -10,6 +10,7 @@ import sys
 import shutil
 import os
 import time
+import json
 
 parent_app = None
 directory = 'pics'
@@ -65,6 +66,9 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
             #print "%s=%s" % (item.name, item.value)
         
+        #print(self.rfile.read().decode("UTF-8"))
+        
+        """
         content = bytes("TEST RESPONSE").encode("UTF-8")
         self.send_response(200)
         self.send_header("Content-type","text/plain")
@@ -78,6 +82,25 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         global parent_app
         if parent_app != None:
             parent_app.process_data(directory + '/' + file_name)
+        """
+            
+        content = bytes("NULL RESPONSE").encode("UTF-8")
+        
+        global parent_app
+        if parent_app != None:
+            ret = parent_app.process_data(directory + '/' + file_name)
+            if ret != None:
+                ret_str = json.dumps(ret)
+                content = bytes(ret_str).encode("UTF-8")
+
+        #print 'content : %s' % content
+        
+        self.send_response(200)
+        self.send_header("Content-type","text/plain")
+        self.send_header("Content-Length", len(content))
+        self.end_headers()
+        self.wfile.write(content)
+        
         
 if __name__ == '__main__':
     WebService().initialize("192.168.0.18", 8080)

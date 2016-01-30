@@ -185,7 +185,8 @@ class DrawWindow(BufferedWindow):
                 
                 dc.SetBrush(wx.TRANSPARENT_BRUSH) 
                 dc.SetPen(wx.Pen(color, 3))
-                dc.DrawRectangle(*r)
+                #dc.DrawRectangle(*r)
+                dc.DrawRectangle(r[0], r[1], r[2]-r[0], r[3]-r[1])
                     
             """
             elif key == "Ellipses":
@@ -266,20 +267,24 @@ class DemoApp(wx.App):
         #print 'detect_result : %s' % detect_result
         
         rects = {}
-        l = []
         for key in detect_result.keys():
             if key == 0:        # background
                 continue
             
+            l = []
             values = detect_result[key]
+            
             inds = np.where(values[:, -1]> self.conf_thresh)[0]
             
             if len(inds) == 0:
                 continue
             
+            values = values.astype(np.int)
+
             for ind in inds:
                 one_rect = values[ind]
-                l.append((one_rect[0], one_rect[1], one_rect[2]-one_rect[0], one_rect[3]-one_rect[1])) 
+                #l.append((one_rect[0], one_rect[1], one_rect[2]-one_rect[0], one_rect[3]-one_rect[1])) 
+                l.append((one_rect[0], one_rect[1], one_rect[2], one_rect[3]))
         
             rects[key] = l
 
@@ -288,6 +293,11 @@ class DemoApp(wx.App):
         wx.CallAfter(self.frame.Window.UpdateDrawing)
 
         self.in_progress = False
+        
+        #ret = rects.copy()
+        #ret['file_name'] = file_name.split('/')[-1]
+        
+        return rects
         
     def gogo(self, ip, port, conf_thresh):
         self.detector = Detector()
@@ -302,7 +312,7 @@ class DemoApp(wx.App):
 if __name__ == "__main__":
     IP = "192.168.0.18"
     PORT = 8080
-    CONF_THRESH = 0.8
+    CONF_THRESH = 0.95
 
     app = DemoApp(0)
     app.gogo(IP, PORT, CONF_THRESH)
