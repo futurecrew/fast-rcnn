@@ -11,6 +11,7 @@ import numpy as np
 import _init_paths
 from web_server import WebService
 from detect_engine import Detector, CLASSES
+from threading import Condition
 
 # This has been set up to optionally use the wx.BufferedDC if
 # USE_BUFFERED_DC is True, it will be used. Otherwise, it uses the raw
@@ -250,18 +251,24 @@ class TestFrame(wx.Frame):
 
 class DemoApp(wx.App):
     def OnInit(self):
-        self.in_progress = False
+        self.working_process_no = 0
+        self.cv = Condition()
         self.frame = TestFrame()
         self.SetTopWindow(self.frame)
 
         return True
 
     def process_data(self, file_name):
-        if self.in_progress == True:
+        if self.working_process_no == 2:
             return None
         
-        self.in_progress = True
+        self.working_process_no += 1
 
+        self.cv.acquire()
+        
+        if self.working_process_no == 2:
+            self.cv.wait()
+        
         detect_result = self.detector.detect(file_name)
         
         #print 'detect_result : %s' % detect_result
@@ -283,7 +290,6 @@ class DemoApp(wx.App):
 
             for ind in inds:
                 one_rect = values[ind]
-                #l.append((one_rect[0], one_rect[1], one_rect[2]-one_rect[0], one_rect[3]-one_rect[1])) 
                 l.append((one_rect[0], one_rect[1], one_rect[2], one_rect[3]))
         
             rects[key] = l
@@ -292,10 +298,10 @@ class DemoApp(wx.App):
         self.frame.Window.file_name = file_name
         wx.CallAfter(self.frame.Window.UpdateDrawing)
 
-        self.in_progress = False
+        self.working_process_no -= 1
         
-        #ret = rects.copy()
-        #ret['file_name'] = file_name.split('/')[-1]
+        self.cv.notify()
+        self.cv.release()
         
         return rects
         
