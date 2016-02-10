@@ -105,7 +105,7 @@ def demo(net, image_name, classes, mixed=False):
                '{:d} object proposals').format(timer.total_time, boxes.shape[0])
 
     # Visualize detections for each class
-    CONF_THRESH = 0.8
+    CONF_THRESH = 0.05
     NMS_THRESH = 0.3
     timer = Timer()
     for cls in classes:
@@ -150,12 +150,12 @@ if __name__ == '__main__':
 
     prototxt_mixed = os.path.join(cfg.ROOT_DIR, 'models', NETS[args.demo_net][0],
                             'rpn', 'test_mixed.prototxt')
-    caffemodel_mixed_frcnn = os.path.join(cfg.ROOT_DIR, 'output', 'fast_rcnn',
-                              'voc_2007_trainval_with_rpn', 
-                              'vgg_cnn_m_1024_fast_rcnn_step4_with_rpn_iter_40000.caffemodel')
-    caffemodel_mixed_rpn = os.path.join(cfg.ROOT_DIR, 'output', 'faster_rcnn',
-                              'voc_2007_trainval', 
-                              'vgg_cnn_m_1024_rpn_step3_iter_80000.caffemodel')
+    caffemodel_mixed_frcnn = os.path.join(cfg.ROOT_DIR, 'output', 'fast_rcnn_lazy',
+                              'voc_2007_2012_trainval_with_rpn', 
+                              'vgg16_fast_rcnn_step2_with_rpn_iter_50000.caffemodel')
+    caffemodel_mixed_rpn = os.path.join(cfg.ROOT_DIR, 'output', 'faster_rcnn_lazy',
+                              'voc_2007_2012_trainval', 
+                              'vgg16_rpn_iter_80000.caffemodel')
 
     if not os.path.isfile(caffemodel):
         raise IOError(('{:s} not found.\nDid you run ./data/script/'
@@ -168,28 +168,30 @@ if __name__ == '__main__':
         caffe.set_device(args.gpu_id)
     net = caffe.Net(prototxt, caffemodel, caffe.TEST)
     
-    net_mixed = caffe.Net(prototxt_mixed, caffe.TEST)
-    net_mixed.copy_from(caffemodel_mixed_frcnn)
-    net_mixed.copy_from(caffemodel_mixed_rpn)
-
     print '\n\nLoaded network {:s}'.format(caffemodel)
 
+    """
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/000004.jpg'
     
-    #demo(net, '000004', ('car',), mixed=False)
-    #plt.show()
-
-    demo(net_mixed, '000004', ('car',), mixed=True)
+    demo(net, '000004', ('car',), mixed=False)
     plt.show()
 
     
     print '~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~'
     print 'Demo for data/demo/001551.jpg'
-    #demo(net, '001551', ('sofa', 'tvmonitor'), mixed=False)
-    #plt.show()
+    demo(net, '001551', ('sofa', 'tvmonitor'), mixed=False)
+    plt.show()
+    """
+    
+    
+    net_mixed = caffe.Net(prototxt_mixed, caffe.TEST)
+    net_mixed.copy_from(caffemodel_mixed_frcnn)
+    net_mixed.copy_from(caffemodel_mixed_rpn)
 
-    demo(net_mixed, '001551', ('sofa', 'tvmonitor'), mixed=True)
+    demo(net_mixed, '000004', ('car',), mixed=True)
     plt.show()
     
+    demo(net_mixed, '001551', ('sofa', 'tvmonitor'), mixed=True)
+    plt.show()
     

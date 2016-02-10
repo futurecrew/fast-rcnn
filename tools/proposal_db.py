@@ -5,6 +5,7 @@ import cPickle
 import scipy.io as sio
 from datasets.factory import get_imdb
 import numpy as np
+from numpy import ndarray
 
 def remove_folder( folder):
     if os.path.exists(folder) == False:
@@ -53,6 +54,8 @@ def make_proposal_db(input_proposal, output_db, box_order = None):
         for i in xrange(raw_file_data.shape[0]):
             file = raw_file_data[i]
             if isinstance(file, list) == True:
+                file = file[0]
+            elif isinstance(file, ndarray) == True:
                 file = file[0]
             file_list.append(file.encode('ascii', 'ignore'))
         box_list = []
@@ -164,7 +167,8 @@ if __name__ == '__main__':
     #input_file = '/home/nvidia/www/workspace/fast-rcnn/output/ss/trainval/ss_voc_2007_trainval_output.mat'
     #box_order = (1, 0, 3, 2)
     
-    input_file = '/home/dj/big/workspace/fast-rcnn/data/selective_search_data/voc_2007_test.mat'
+    input_file = '/media/big/project/fast-rcnn/data/selective_search_data/voc_2007_test.mat'
+    #input_file = '/media/big/project/fast-rcnn/data/cache/voc_2007_test_selective_search_roidb.pkl'
     #input_file = '/home/nvidia/www/workspace/fast-rcnn/data/selective_search_data/imagenet_val.mat'
     box_order = (1, 0, 3, 2)
     output_db = input_file.split('.')[0] + '_db'
@@ -179,8 +183,8 @@ if __name__ == '__main__':
     output_db = input_file_list[0].split('.')[0] + '_' + str(len(input_file_list)) + '_models_db'
     """
     
-    #make_proposal_db(input_file, output_db, box_order)
-    read_data('/home/dj/big/workspace/fast-rcnn/output/rpn_data/voc_2007_2012_trainval/vgg16_step_1_rpn_top_2300_candidate_db')
+    make_proposal_db(input_file, output_db, box_order)
+    #read_data('/home/dj/big/workspace/fast-rcnn/output/rpn_data/voc_2007_2012_trainval/vgg16_step_1_rpn_top_2300_candidate_db')
     
     #make_classification_db(imdb, input_file_list, output_db)
 

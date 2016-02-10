@@ -24,7 +24,7 @@ from utils.box_prediction import get_predicted_boxes
 from caffe import nms_cpp
 from caffe import nms_cuda
 from util import prevent_sleep
-from utils.proposal_db import make_db
+from proposal_db import make_proposal_db
 
 
 def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
@@ -125,7 +125,7 @@ def gogo(MAX_CAND_AFTER_NMS, gpu_id_list, MULTI_CPU_NO,
     print 'wrote rpn roidb to {}'.format(proposal_file)
     
     print 'converting proposal pickle into DB'
-    make_db(proposal_file, proposal_file.split('.')[0] + '_db')
+    make_proposal_db(proposal_file, proposal_file.split('.')[0] + '_db')
     
         
 def gogo_one_gpu(MAX_CAND_AFTER_NMS, MULTI_CPU_NO,

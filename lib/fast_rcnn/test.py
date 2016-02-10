@@ -355,7 +355,8 @@ def test_net(nets, imdb, proposal, proposal_file, classification_file, output_di
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    candidiate_db = leveldb.LevelDB(proposal_file)
+    if proposal_file != '':
+        candidiate_db = leveldb.LevelDB(proposal_file)
     
     if classification_file != None:
         classification_db = leveldb.LevelDB(classification_file)
