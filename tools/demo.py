@@ -105,7 +105,7 @@ def demo(net, image_name, classes, mixed=False):
                '{:d} object proposals').format(timer.total_time, boxes.shape[0])
 
     # Visualize detections for each class
-    CONF_THRESH = 0.05
+    CONF_THRESH = 0.8
     NMS_THRESH = 0.3
     timer = Timer()
     for cls in classes:
@@ -152,10 +152,10 @@ if __name__ == '__main__':
                             'rpn', 'test_mixed.prototxt')
     caffemodel_mixed_frcnn = os.path.join(cfg.ROOT_DIR, 'output', 'fast_rcnn_lazy',
                               'voc_2007_2012_trainval_with_rpn', 
-                              'vgg16_fast_rcnn_step2_with_rpn_iter_50000.caffemodel')
+                              'vgg16_fast_rcnn_step4_with_rpn_iter_120000.caffemodel')
     caffemodel_mixed_rpn = os.path.join(cfg.ROOT_DIR, 'output', 'faster_rcnn_lazy',
                               'voc_2007_2012_trainval', 
-                              'vgg16_rpn_iter_80000.caffemodel')
+                              'vgg16_rpn_step3_iter_80000.caffemodel')
 
     if not os.path.isfile(caffemodel):
         raise IOError(('{:s} not found.\nDid you run ./data/script/'

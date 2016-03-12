@@ -123,13 +123,13 @@ class DrawWindow(BufferedWindow):
         elif key == 6:
             color = 'CYAN'
         elif key == 7:
-            color = 'GREEN'
+            color = 'LIME GREEN'
         elif key == 8:
             color = 'MAGENTA'
         elif key == 9:
             color = 'ORANGE'
         elif key == 10:
-            color = 'YELLOW'
+            color = 'AQUAMARINE'
         elif key == 11:
             color = 'PINK'
         elif key == 12:
@@ -139,7 +139,7 @@ class DrawWindow(BufferedWindow):
         elif key == 14:
             color = 'PLUM'
         elif key == 15:
-            color = 'AQUAMARINE'
+            color = 'YELLOW'
         elif key == 16:
             color = 'GOLD'
         elif key == 17:
@@ -258,7 +258,9 @@ class DemoApp(wx.App):
 
         return True
 
-    def process_data(self, file_name):
+    def process_data(self, file_name, mode):
+        print 'self.working_process_no : %s' % self.working_process_no
+        
         if self.working_process_no == 2:
             return None
         
@@ -269,7 +271,7 @@ class DemoApp(wx.App):
         if self.working_process_no == 2:
             self.cv.wait()
         
-        detect_result = self.detector.detect(file_name)
+        detect_result = self.detector.detect(file_name, mode)
         
         #print 'detect_result : %s' % detect_result
         

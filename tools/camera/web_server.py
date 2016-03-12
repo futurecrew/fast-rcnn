@@ -59,6 +59,8 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         for item in form.list:
             if item.name == 'name':
                 file_name = item.value
+            elif item.name == 'mode':
+                mode = item.value
             elif item.name == 'data':
                 f = open(directory + '/' + file_name, 'wb+')
                 f.write(item.value)
@@ -88,7 +90,7 @@ class ServerHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
         
         global parent_app
         if parent_app != None:
-            ret = parent_app.process_data(directory + '/' + file_name)
+            ret = parent_app.process_data(directory + '/' + file_name, mode)
             if ret != None:
                 ret_str = json.dumps(ret)
                 content = bytes(ret_str).encode("UTF-8")

@@ -21,6 +21,9 @@ CLASSES = ('__background__',
            'motorbike', 'person', 'pottedplant',
            'sheep', 'sofa', 'train', 'tvmonitor')
 
+CLASSES_CAR = ('__background__',
+           'bicycle', 'bus', 'car', 'motorbike', 'person')
+
 NETS = {'vgg16': ('VGG16',
                   'vgg16_fast_rcnn_iter_40000.caffemodel'),
         'vgg16_comp': ('VGG16/compressed',
@@ -35,7 +38,7 @@ NETS = {'vgg16': ('VGG16',
                      'caffenet_fast_rcnn_iter_40000_svd_fc6_1024_fc7_256.caffemodel')}
 
 class Detector(object):
-    def detect(self, image_name, mixed=True):
+    def detect(self, image_name, mode, mixed=True):
         
         # DJDJ
         # Load the demo image
@@ -61,7 +64,16 @@ class Detector(object):
         NMS_THRESH = 0.3
         timer = Timer()
         result = {}
+        
+        if mode == '3':     # Car mode
+            classes = CLASSES_CAR
+        else:
+            classes = CLASSES
+            
         for cls in CLASSES:
+            if mode == '3' and (cls in CLASSES_CAR) == False:     # Car mode
+                continue
+            
             cls_ind = CLASSES.index(cls)
             cls_boxes = boxes[:, 4*cls_ind:4*(cls_ind + 1)]
             cls_scores = scores[:, cls_ind]
@@ -82,7 +94,10 @@ class Detector(object):
                 
     def initialize(self, app):
         prototxt = 'models/VGG16/rpn/test_mixed.prototxt'
-        caffemodel_mixed_frcnn = 'output/fast_rcnn_lazy/voc_2007_2012_trainval_with_rpn/vgg16_fast_rcnn_step4_with_rpn_iter_140000.caffemodel'    
+        #caffemodel_mixed_frcnn = 'output/fast_rcnn_lazy/voc_2007_2012_trainval_with_rpn/vgg16_fast_rcnn_step4_with_rpn_iter_140000.caffemodel'    
+        #caffemodel_mixed_rpn = 'output/faster_rcnn_lazy/voc_2007_2012_trainval/vgg16_rpn_step3_iter_80000.caffemodel'    
+        
+        caffemodel_mixed_frcnn = 'output/fast_rcnn_lazy/voc_2007_2012_trainval_with_rpn/vgg16_fast_rcnn_step4_with_rpn_iter_110000.caffemodel'    
         caffemodel_mixed_rpn = 'output/faster_rcnn_lazy/voc_2007_2012_trainval/vgg16_rpn_step3_iter_80000.caffemodel'    
     
         if not os.path.isfile(caffemodel_mixed_frcnn):
